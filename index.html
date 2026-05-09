@@ -941,7 +941,13 @@ function cancelEdit(id) {
   // === VIEW SWITCHING ===
   // === CALENDAR ===
   // === INIT ===
-  loadTasks();
+loadTasks();
+
+document.addEventListener('click', function (e) {
+  if (editingId && !e.target.closest(`#ti-${editingId}`)) {
+    cancelEdit(editingId);
+  }
+});
 </script>
 </body>
 </html>
