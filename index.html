@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>my tasks</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%232D5016'/><path d='M8 16l6 6 10-12' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,400&display=swap" rel="stylesheet">
   <style>
@@ -336,8 +337,8 @@
 
   // === DATA ===
   const CATEGORIES = [
-    { id: 'finance',   label: 'Finance',           emoji: '💰' },
     { id: 'admin',     label: 'Life admin',        emoji: '🏠' },
+    { id: 'finance',   label: 'Finance',           emoji: '💰' },
     { id: 'projects',  label: 'Personal projects', emoji: '🚀' },
     { id: 'mishmish',  label: 'Mishmish',          emoji: '🐱' },
     { id: 'social',    label: 'Social',            emoji: '🎉' },
@@ -474,7 +475,7 @@
   function isUrgent(task) {
     if (task.priority === 'urgent') return true;
     const d = getDaysUntil(task.due);
-    return d !== null && d < 0;
+    return d !== null && d <= 0;
   }
 
   function isHigh(task) {
@@ -1078,6 +1079,13 @@ async function drop(event, catId) {
     cleanText = cleanText.replace(/^[,\s]+|[,\s]+$/g, '').trim();
     // Capitalise first letter
     if (cleanText.length > 0) cleanText = cleanText[0].toUpperCase() + cleanText.slice(1);
+
+    // Default: one month deadline if no due date was found
+    if (!due) {
+      const d = new Date(today);
+      d.setMonth(d.getMonth() + 1);
+      due = toYMD(d);
+    }
 
     return {
       text: cleanText || raw.trim(),
