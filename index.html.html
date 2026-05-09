@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My To-Do List</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  /* =============================================
+     PASTE YOUR SUPABASE CREDENTIALS BELOW
+     ============================================= */
+
+  :root {
+    --supabase-url: 'https://sibrhaeyfhdgayxmusrz.supabase.co/rest/v1/';
+    --supabase-key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYnJoYWV5ZmhkZ2F5eG11c3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzUzODIsImV4cCI6MjA5Mzg1MTM4Mn0.WreY_tBeo5UPBtMK5SC2FvwS5iere21sZlYkBTYwaTg';
+  }
+
+  /* =============================================
+     END OF CREDENTIALS SECTION
+     ============================================= */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #F7F5F0;
+    --surface: #FFFFFF;
+    --surface2: #F0EDE6;
+    --border: rgba(0,0,0,0.08);
+    --border-strong: rgba(0,0,0,0.15);
+    --text: #1A1714;
+    --text-muted: #6B6760;
+    --text-faint: #A8A5A0;
+    --accent: #2D5016;
+    --accent-light: #E8F0E0;
+    --urgent: #C0392B;
+    --urgent-light: #FDECEA;
+    --high: #B7621A;
+    --high-light: #FEF0E3;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1A1714;
+      --surface: #242019;
+      --surface2: #2D2924;
+      --border: rgba(255,255,255,0.08);
+      --border-strong: rgba(255,255,255,0.15);
+      --text: #F0EDE6;
+      --text-muted: #9A9590;
+      --text-faint: #5A5752;
+      --accent: #8DB870;
+      --accent-light: #1E2E15;
+      --urgent: #E05A4E;
+      --urgent-light: #2A1512;
+      --high: #D4853A;
+      --high-light: #2A1E10;
+    }
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 1.5rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .header-inner {
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    color: var(--text);
+    flex: 1;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .sync-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+    transition: background 0.3s;
+  }
+  .sync-dot.syncing { background: #F0A500; animation: pulse 1s infinite; }
+  .sync-dot.synced { background: #4CAF50; }
+  .sync-dot.error { background: var(--urgent); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 4rem;
+  }
+
+  .input-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+  }
+
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+
+  textarea#taskInput {
+    flex: 1;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    padding: 10px 12px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--surface2);
+    color: var(--text);
+    resize: none;
+    min-height: 44px;
+    max-height: 120px;
+    overflow-y: auto;
+  }
+
+  textarea#taskInput:focus { outline: none; border-color: var(--accent); }
+  textarea#taskInput::placeholder { color: var(--text-faint); }
+
+  .add-btn {
+    height: 44px;
+    padding: 0 16px;
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: opacity 0.15s, transform 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .add-btn:hover { opacity: 0.85; }
+  .add-btn:active { transform: scale(0.97); }
+  .add-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .ai-status {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-faint);
+    min-height: 18px;
+    font-style: italic;
+  }
+
+  .clarify-box {
+    margin-top: 10px;
+    padding: 10px 14px;
+    background: var(--accent-light);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    color: var(--accent);
+    display: none;
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 1.25rem;
+  }
+
+  .stat-pill {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .stat-pill.danger { background: var(--urgent-light); color: var(--urgent); border-color: transparent; }
+  .stat-pill.warning { background: var(--high-light); color: var(--high); border-color: transparent; }
+
+  .category-section { margin-bottom: 1.5rem; }
+
+  .cat-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 0 2px;
+  }
+
+  .cat-emoji { font-size: 16px; }
+
+  .cat-label {
+    font-size: 12px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+  }
+
+  .cat-count {
+    font-size: 12px;
+    color: var(--text-faint);
+    margin-left: auto;
+  }
+
+  .task-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 11px 13px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+
+  .task-item:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
+  .task-item.urgent { border-left: 3px solid var(--urgent); }
+  .task-item.high { border-left: 3px solid var(--high); }
+
+  .task-check {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-strong);
+    cursor: pointer;
+    flex-shrink: 0;
+    margin-top: 2px;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+  }
+
+  .task-check:hover { border-color: var(--accent); background: var(--accent-light); }
+
+  .task-body { flex: 1; min-width: 0; }
+
+  .task-text {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--text);
+    word-break: break-word;
+  }
+
+  .task-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+    flex-wrap: wrap;
+  }
+
+  .priority-badge {
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+
+  .p-urgent { background: var(--urgent-light); color: var(--urgent); }
+  .p-high { background: var(--high-light); color: var(--high); }
+
+  .task-due {
+    font-size: 12px;
+    color: var(--text-faint);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .task-due.overdue { color: var(--urgent); }
+  .task-due.soon { color: var(--high); }
+
+  .task-notes {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    font-style: italic;
+  }
+
+  .task-delete {
+    opacity: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-faint);
+    font-size: 18px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    line-height: 1;
+    transition: opacity 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .task-item:hover .task-delete { opacity: 1; }
+  .task-delete:hover { color: var(--urgent); }
+
+  .empty-cat {
+    font-size: 13px;
+    color: var(--text-faint);
+    padding: 4px 4px;
+    font-style: italic;
+  }
+
+  .archive-toggle {
+    font-size: 13px;
+    color: var(--text-faint);
+    cursor: pointer;
+    text-decoration: underline;
+    margin-top: 1.5rem;
+    display: none;
+    background: none;
+    border: none;
+    font-family: 'DM Sans', sans-serif;
+    padding: 0;
+  }
+
+  .archive-section { margin-top: 1rem; }
+
+  .archived-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    margin-bottom: 4px;
+    opacity: 0.55;
+  }
+
+  .archived-text {
+    font-size: 13px;
+    color: var(--text-muted);
+    text-decoration: line-through;
+    flex: 1;
+  }
+
+  .archived-del {
+    background: none;
+    border: none;
+    color: var(--text-faint);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 2px;
+  }
+
+  .loading-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .loading-screen p {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text-muted);
+  }
+
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 480px) {
+    main { padding: 1rem 0.75rem 4rem; }
+    header { padding: 1rem; }
+    .logo { font-size: 19px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+  <p>Loading your tasks...</p>
+</div>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">my <span>tasks</span></div>
+    <div class="sync-dot" id="syncDot" title="Sync status"></div>
+  </div>
+</header>
+
+<main>
+  <div class="input-card">
+    <div class="input-row">
+      <textarea id="taskInput" placeholder="Add a task... type or speak naturally, e.g. 'call the vet about Mishmish booster next Tuesday'" rows="2"></textarea>
+      <button class="add-btn" id="addBtn" onclick="handleAdd()">
+        ✦ Add
+      </button>
+    </div>
+    <div class="ai-status" id="aiStatus"></div>
+    <div class="clarify-box" id="clarifyBox"></div>
+  </div>
+
+  <div class="stats-row" id="statsRow"></div>
+  <div id="taskList"></div>
+
+  <button class="archive-toggle" id="archiveToggle" onclick="toggleArchive()"></button>
+  <div class="archive-section" id="archiveSection" style="display:none"></div>
+</main>
+
+<script>
+// =============================================
+// PASTE YOUR SUPABASE CREDENTIALS HERE
+// =============================================
+const SUPABASE_URL = 'https://sibrhaeyfhdgayxmusrz.supabase.co/rest/v1/';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYnJoYWV5ZmhkZ2F5eG11c3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzUzODIsImV4cCI6MjA5Mzg1MTM4Mn0.WreY_tBeo5UPBtMK5SC2FvwS5iere21sZlYkBTYwaTg';
+// =============================================
+// END OF CREDENTIALS
+// =============================================
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const CATEGORIES = [
+  { id: 'personal',  label: 'Personal life',           emoji: '🌸', bg: '#FBE8F0', text: '#7A1E47' },
+  { id: 'finance',   label: 'Finance & investments',   emoji: '💰', bg: '#FEF0E3', text: '#7A3E10' },
+  { id: 'home',      label: 'Home & life admin',       emoji: '🏠', bg: '#E8F0FB', text: '#1A4080' },
+  { id: 'projects',  label: 'Personal projects',       emoji: '🚀', bg: '#EEEDFE', text: '#3C3489' },
+  { id: 'health',    label: 'Health & wellbeing',      emoji: '💚', bg: '#E8F3DC', text: '#2A5010' },
+  { id: 'mishmish',  label: 'Mishmish',                emoji: '🐱', bg: '#FEF4E3', text: '#7A4E10' },
+  { id: 'social',    label: 'Social',                  emoji: '🎉', bg: '#E3F5EE', text: '#0A5038' },
+];
+
+let tasks = [];
+let archived = [];
+let showArchive = false;
+
+function setSyncStatus(s) {
+  const dot = document.getElementById('syncDot');
+  dot.className = 'sync-dot ' + s;
+}
+
+async function loadTasks() {
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db.from('tasks').select('*').order('created_at', { ascending: true });
+    if (error) throw error;
+    tasks = data.filter(t => !t.completed);
+    archived = data.filter(t => t.completed);
+    purgeOldArchive();
+    setSyncStatus('synced');
+  } catch(e) {
+    setSyncStatus('error');
+    console.error(e);
+  }
+  document.getElementById('loadingScreen').style.display = 'none';
+  render();
+}
+
+async function addTask(task) {
+  setSyncStatus('syncing');
+  try {
+    const { data, error } = await db.from('tasks').insert([task]).select();
+    if (error) throw error;
+    tasks.push(data[0]);
+    setSyncStatus('synced');
+  } catch(e) {
+    setSyncStatus('error');
+    tasks.push({ ...task, id: 'local_' + Date.now() });
+  }
+  render();
+}
+
+async function completeTask(id) {
+  setSyncStatus('syncing');
+  const now = new Date().toISOString();
+  try {
+    await db.from('tasks').update({ completed: true, completed_at: now }).eq('id', id);
+    setSyncStatus('synced');
+  } catch(e) { setSyncStatus('error'); }
+  const idx = tasks.findIndex(t => t.id === id);
+  if (idx > -1) {
+    const t = tasks.splice(idx, 1)[0];
+    t.completed = true;
+    t.completed_at = now;
+    archived.push(t);
+  }
+  render();
+}
+
+async function deleteTask(id) {
+  setSyncStatus('syncing');
+  try {
+    await db.from('tasks').delete().eq('id', id);
+    setSyncStatus('synced');
+  } catch(e) { setSyncStatus('error'); }
+  tasks = tasks.filter(t => t.id !== id);
+  render();
+}
+
+async function deleteArchived(id) {
+  setSyncStatus('syncing');
+  try {
+    await db.from('tasks').delete().eq('id', id);
+    setSyncStatus('synced');
+  } catch(e) { setSyncStatus('error'); }
+  archived = archived.filter(t => t.id !== id);
+  renderArchiveToggle();
+}
+
+async function purgeOldArchive() {
+  const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+  const toDelete = archived.filter(t => t.completed_at && t.completed_at < cutoff);
+  if (toDelete.length) {
+    const ids = toDelete.map(t => t.id);
+    await db.from('tasks').delete().in('id', ids);
+    archived = archived.filter(t => !ids.includes(t.id));
+  }
+}
+
+function getDaysUntil(dateStr) {
+  if (!dateStr) return null;
+  const due = new Date(dateStr);
+  const now = new Date();
+  now.setHours(0,0,0,0); due.setHours(0,0,0,0);
+  return Math.round((due - now) / 86400000);
+}
+
+function formatDue(dateStr) {
+  if (!dateStr) return null;
+  const days = getDaysUntil(dateStr);
+  if (days < 0) return { text: `Overdue by ${Math.abs(days)}d`, cls: 'overdue' };
+  if (days === 0) return { text: 'Due today', cls: 'soon' };
+  if (days === 1) return { text: 'Due tomorrow', cls: 'soon' };
+  if (days <= 5) return { text: `Due in ${days}d`, cls: 'soon' };
+  const d = new Date(dateStr);
+  return { text: `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`, cls: '' };
+}
+
+function isUrgent(t) {
+  if (t.priority === 'urgent') return true;
+  const d = getDaysUntil(t.due); return d !== null && d <= 1;
+}
+
+function isHigh(t) {
+  if (t.priority === 'high') return true;
+  const d = getDaysUntil(t.due); return d !== null && d <= 5 && !isUrgent(t);
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderStats() {
+  const overdue = tasks.filter(t => getDaysUntil(t.due) < 0).length;
+  const soon = tasks.filter(t => { const d = getDaysUntil(t.due); return d !== null && d >= 0 && d <= 3; }).length;
+  let html = `<span class="stat-pill">${tasks.length} active</span>`;
+  if (overdue) html += `<span class="stat-pill danger">${overdue} overdue</span>`;
+  if (soon) html += `<span class="stat-pill warning">${soon} due soon</span>`;
+  document.getElementById('statsRow').innerHTML = html;
+}
+
+function renderTaskItem(t) {
+  const cls = isUrgent(t) ? 'urgent' : isHigh(t) ? 'high' : '';
+  const due = t.due ? formatDue(t.due) : null;
+  return `<div class="task-item ${cls}" id="ti-${t.id}">
+    <button class="task-check" onclick="completeTask('${t.id}')" aria-label="Mark complete"></button>
+    <div class="task-body">
+      <div class="task-text">${t.emoji ? t.emoji + ' ' : ''}${esc(t.text)}</div>
+      <div class="task-meta">
+        ${t.priority && t.priority !== 'normal' ? `<span class="priority-badge p-${t.priority}">${t.priority}</span>` : ''}
+        ${due ? `<span class="task-due ${due.cls}">📅 ${due.text}</span>` : ''}
+      </div>
+      ${t.notes ? `<div class="task-notes">${esc(t.notes)}</div>` : ''}
+    </div>
+    <button class="task-delete" onclick="deleteTask('${t.id}')" aria-label="Delete">✕</button>
+  </div>`;
+}
+
+function renderCat(cat, catTasks) {
+  catTasks.sort((a, b) => {
+    const da = getDaysUntil(a.due), db = getDaysUntil(b.due);
+    if (da !== null && db !== null) return da - db;
+    if (da !== null) return -1; if (db !== null) return 1;
+    const po = { urgent: 0, high: 1, normal: 2 };
+    return (po[a.priority]||2) - (po[b.priority]||2);
+  });
+  return `<div class="category-section">
+    <div class="cat-header">
+      <span class="cat-emoji">${cat.emoji}</span>
+      <span class="cat-label" style="background:${cat.bg};color:${cat.text}">${cat.label}</span>
+      <span class="cat-count">${catTasks.length}</span>
+    </div>
+    ${catTasks.length ? catTasks.map(renderTaskItem).join('') : '<div class="empty-cat">Nothing here</div>'}
+  </div>`;
+}
+
+function render() {
+  let html = '';
+  const urgentTasks = tasks.filter(t => isUrgent(t));
+  if (urgentTasks.length) {
+    html += renderCat({ id: 'urgent', label: 'Urgent / overdue', emoji: '🔴', bg: 'var(--urgent-light)', text: 'var(--urgent)' }, urgentTasks);
+  }
+  CATEGORIES.forEach(cat => {
+    const ct = tasks.filter(t => t.category === cat.id && !isUrgent(t));
+    html += renderCat(cat, ct);
+  });
+  const uncat = tasks.filter(t => !t.category && !isUrgent(t));
+  if (uncat.length) html += renderCat({ id: 'other', label: 'Other', emoji: '📌', bg: 'var(--surface2)', text: 'var(--text-muted)' }, uncat);
+  document.getElementById('taskList').innerHTML = html;
+  renderStats();
+  renderArchiveToggle();
+}
+
+function renderArchiveToggle() {
+  const toggle = document.getElementById('archiveToggle');
+  const sec = document.getElementById('archiveSection');
+  if (!archived.length) { toggle.style.display = 'none'; sec.style.display = 'none'; return; }
+  toggle.style.display = 'inline-block';
+  toggle.textContent = showArchive ? `Hide completed (${archived.length})` : `Show completed (${archived.length})`;
+  if (showArchive) {
+    sec.style.display = 'block';
+    sec.innerHTML = archived.slice().reverse().slice(0, 50).map(t =>
+      `<div class="archived-item">
+        <span style="font-size:13px;color:var(--text-faint)">✓</span>
+        <span class="archived-text">${t.emoji ? t.emoji+' ' : ''}${esc(t.text)}</span>
+        <button class="archived-del" onclick="deleteArchived('${t.id}')" aria-label="Remove">✕</button>
+      </div>`
+    ).join('');
+  } else {
+    sec.style.display = 'none';
+  }
+}
+
+function toggleArchive() {
+  showArchive = !showArchive;
+  renderArchiveToggle();
+}
+
+function setStatus(msg) { document.getElementById('aiStatus').textContent = msg; }
+function clearStatus() { document.getElementById('aiStatus').textContent = ''; }
+function showClarify(msg) {
+  const b = document.getElementById('clarifyBox');
+  b.textContent = '💬 ' + msg; b.style.display = 'block';
+}
+function hideClarify() { document.getElementById('clarifyBox').style.display = 'none'; }
+
+async function handleAdd() {
+  const input = document.getElementById('taskInput');
+  const raw = input.value.trim();
+  if (!raw) return;
+  const btn = document.getElementById('addBtn');
+  btn.disabled = true;
+  input.value = '';
+  hideClarify();
+  setStatus('Claude is parsing your task...');
+
+  const today = new Date().toISOString().slice(0,10);
+  const systemPrompt = `You are a task parser. Given natural language input, return ONLY valid JSON — no markdown, no explanation.
+
+Categories: personal, finance, home, projects, health, mishmish, social
+Priority: urgent, high, normal
+Today: ${today}
+
+Return exactly:
+{
+  "text": "clean task description",
+  "category": "category id",
+  "priority": "urgent|high|normal",
+  "emoji": "single emoji or null",
+  "due": "YYYY-MM-DD or null",
+  "notes": "extra context or null",
+  "clarify": "short question if genuinely ambiguous, or null"
+}
+
+Rules:
+- mishmish is the user's cat — mishmish tasks go in mishmish category
+- urgent = needs doing today or ASAP
+- high = deadline within a week
+- Resolve relative dates (next Tuesday, end of week, in 3 days) to YYYY-MM-DD
+- Pick a relevant emoji that adds meaning, or null`;
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: raw }]
+      })
+    });
+    const data = await res.json();
+    const block = data.content && data.content.find(b => b.type === 'text');
+    if (!block) throw new Error('No response');
+    const parsed = JSON.parse(block.text.replace(/```json|```/g,'').trim());
+    const task = {
+      text: parsed.text || raw,
+      category: parsed.category || 'personal',
+      priority: parsed.priority || 'normal',
+      emoji: parsed.emoji || null,
+      due: parsed.due || null,
+      notes: parsed.notes || null,
+      completed: false
+    };
+    await addTask(task);
+    clearStatus();
+    if (parsed.clarify) showClarify(parsed.clarify);
+  } catch(e) {
+    await addTask({ text: raw, category: 'personal', priority: 'normal', emoji: null, due: null, notes: null, completed: false });
+    setStatus('Added — AI parsing unavailable, saved as-is');
+    clearStatus();
+  }
+  btn.disabled = false;
+}
+
+document.getElementById('taskInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd(); }
+});
+
+loadTasks();
+</script>
+</body>
+</html>
