@@ -57,6 +57,7 @@ Rules:
 
       const data = await response.json();
       return new Response(JSON.stringify(data), {
+        status: response.status,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });
     } catch (e) {
