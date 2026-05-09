@@ -78,7 +78,7 @@ Monthly grid. Days with tasks due show a dot indicator. Clicking a day expands a
 
 **Text input**: press Enter (without Shift) or click Add to submit.
 
-**Voice input**: press the mic button → browser requests microphone permission → status shows "Listening..." → speech is transcribed in real time and drops into the textarea → transcript can be reviewed/edited before submitting → auto-submits after a 2-second pause if no edits are made. Uses the Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`). Works on iOS Safari and Android Chrome.
+**Voice input**: press the mic button → browser requests microphone permission → status shows "Listening..." → speech is transcribed in real time and drops into the textarea → user always reviews and edits the transcript before hitting Add manually. Uses the Web Speech API (`webkitSpeechRecognition` / `SpeechRecognition`). Works on iOS Safari and Android Chrome.
 
 **Claude parsing**: the textarea content is sent to the Cloudflare Worker which calls `claude-sonnet-4-20250514`. Claude returns JSON:
 ```json
