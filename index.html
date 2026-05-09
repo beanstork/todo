@@ -302,12 +302,174 @@
 
 <script>
   // === CONFIG ===
+  const SUPABASE_URL = 'https://sibrhaeyfhdgayxmusrz.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNpYnJoYWV5ZmhkZ2F5eG11c3J6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgyNzUzODIsImV4cCI6MjA5Mzg1MTM4Mn0.WreY_tBeo5UPBtMK5SC2FvwS5iere21sZlYkBTYwaTg';
+
   // === DATA ===
+  const CATEGORIES = [
+    { id: 'personal',  label: 'Personal life',     emoji: '🌸', bg: '#FBE8F0', color: '#7A1E47' },
+    { id: 'finance',   label: 'Finance',           emoji: '💰', bg: '#FEF0E3', color: '#7A3E10' },
+    { id: 'admin',     label: 'Life admin',        emoji: '🏠', bg: '#E8F0FB', color: '#1A4080' },
+    { id: 'projects',  label: 'Personal projects', emoji: '🚀', bg: '#EEEDFE', color: '#3C3489' },
+    { id: 'mishmish',  label: 'Mishmish',          emoji: '🐱', bg: '#FEF4E3', color: '#7A4E10' },
+    { id: 'social',    label: 'Social',            emoji: '🎉', bg: '#E3F5EE', color: '#0A5038' },
+  ];
+
   // === STATE ===
+  let tasks = [];
+  let archived = [];
+  let activeFilter = null;
+  let activeView = 'list';
+  let calendarDate = new Date();
+  let selectedCalendarDay = null;
+  let isListening = false;
+  let recognition = null;
+  let editingId = null;
+
   // === SUPABASE CLIENT ===
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
   // === SYNC UTILS ===
+  function setSyncStatus(s) {
+    document.getElementById('syncDot').className = 'sync-dot ' + s;
+  }
+  function setStatus(msg) { document.getElementById('aiStatus').textContent = msg; }
+  function clearStatus() { document.getElementById('aiStatus').textContent = ''; }
+
   // === DB OPERATIONS ===
+  async function loadTasks() {
+    setSyncStatus('syncing');
+    try {
+      const { data, error } = await db.from('tasks').select('*').order('created_at', { ascending: true });
+      if (error) throw error;
+      tasks = data.filter(t => !t.completed);
+      archived = data.filter(t => t.completed);
+      await purgeOldArchive();
+      setSyncStatus('synced');
+      document.getElementById('errorState').style.display = 'none';
+      document.getElementById('listView').style.display = 'block';
+    } catch (e) {
+      setSyncStatus('error');
+      document.getElementById('errorState').style.display = 'block';
+      document.getElementById('listView').style.display = 'none';
+      console.error('loadTasks error:', e);
+    } finally {
+      document.getElementById('loadingScreen').style.display = 'none';
+    }
+    render();
+  }
+
+  async function addTaskToDb(task) {
+    setSyncStatus('syncing');
+    try {
+      const { data, error } = await db.from('tasks').insert([task]).select();
+      if (error) throw error;
+      tasks.push(data[0]);
+      setSyncStatus('synced');
+      return true;
+    } catch (e) {
+      setSyncStatus('error');
+      tasks.push({ ...task, id: 'local_' + Date.now() });
+      setStatus('Saved locally — sync failed');
+      return false;
+    }
+  }
+
+  async function updateTaskInDb(id, updates) {
+    setSyncStatus('syncing');
+    try {
+      const { error } = await db.from('tasks').update(updates).eq('id', id);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (e) {
+      setSyncStatus('error');
+      setStatus('Update failed — check connection');
+      return false;
+    }
+  }
+
+  async function deleteTaskFromDb(id) {
+    setSyncStatus('syncing');
+    try {
+      const { error } = await db.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      setSyncStatus('synced');
+      return true;
+    } catch (e) {
+      setSyncStatus('error');
+      setStatus('Delete failed — check connection');
+      return false;
+    }
+  }
+
+  async function purgeOldArchive() {
+    const cutoff = new Date(Date.now() - 30 * 86400000).toISOString();
+    const toDelete = archived.filter(t => t.completed_at && t.completed_at < cutoff);
+    if (!toDelete.length) return;
+    const ids = toDelete.map(t => t.id);
+    try {
+      await db.from('tasks').delete().in('id', ids);
+      archived = archived.filter(t => !ids.includes(t.id));
+    } catch (e) {
+      console.error('purge error:', e);
+    }
+  }
+
   // === DATE UTILS ===
+  function getDaysUntil(dateStr) {
+    if (!dateStr) return null;
+    const due = new Date(dateStr + 'T00:00:00');
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return Math.round((due - now) / 86400000);
+  }
+
+  function formatDue(dateStr) {
+    if (!dateStr) return null;
+    const days = getDaysUntil(dateStr);
+    if (days < 0) return { text: `Overdue by ${Math.abs(days)}d`, cls: 'overdue' };
+    if (days === 0) return { text: 'Due today', cls: 'soon' };
+    if (days === 1) return { text: 'Due tomorrow', cls: 'soon' };
+    if (days <= 5) return { text: `Due in ${days}d`, cls: 'soon' };
+    const d = new Date(dateStr + 'T00:00:00');
+    return { text: `Due ${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}`, cls: '' };
+  }
+
+  function isUrgent(task) {
+    if (task.priority === 'urgent') return true;
+    const d = getDaysUntil(task.due);
+    return d !== null && d < 0;
+  }
+
+  function isHigh(task) {
+    if (task.priority === 'high') return true;
+    const d = getDaysUntil(task.due);
+    return d !== null && d >= 0 && d <= 5 && !isUrgent(task);
+  }
+
+  function sortTasks(arr) {
+    return [...arr].sort((a, b) => {
+      const da = getDaysUntil(a.due);
+      const db2 = getDaysUntil(b.due);
+      const aOver = da !== null && da < 0;
+      const bOver = db2 !== null && db2 < 0;
+      if (aOver && !bOver) return -1;
+      if (!aOver && bOver) return 1;
+      if (aOver && bOver) return da - db2;
+      if (da !== null && db2 !== null) return da - db2;
+      if (da !== null) return -1;
+      if (db2 !== null) return 1;
+      const po = { urgent: 0, high: 1, normal: 2 };
+      return (po[a.priority] || 2) - (po[b.priority] || 2);
+    });
+  }
+
+  function esc(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
   // === RENDERING ===
   // === TASK INTERACTIONS ===
   // === VOICE INPUT ===
@@ -316,6 +478,8 @@
   // === VIEW SWITCHING ===
   // === CALENDAR ===
   // === INIT ===
+  function render() { /* filled in Task 4 */ }
+  loadTasks();
 </script>
 </body>
 </html>
