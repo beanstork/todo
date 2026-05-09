@@ -709,7 +709,10 @@ function startEdit(id) {
   item.querySelector('.task-body').insertAdjacentHTML('beforeend', `
     <div class="task-editor" id="editor-${id}">
       <div style="display:flex;gap:6px;align-items:center">
-        <input class="editor-input" type="text" id="edit-emoji-${id}" value="${esc(task.emoji || '')}" placeholder="emoji" style="width:52px;text-align:center" maxlength="2" />
+        <button type="button" id="edit-emoji-btn-${id}" class="cat-emoji-btn" style="font-size:20px;min-width:36px;padding:2px 4px;border:1px solid var(--border-strong);border-radius:var(--radius-sm)"
+          onclick="showEmojiPicker('edit-emoji-btn-${id}',em=>{document.getElementById('edit-emoji-${id}').value=em;document.getElementById('edit-emoji-btn-${id}').textContent=em})"
+          title="Pick emoji">${esc(task.emoji || '🙂')}</button>
+        <input type="hidden" id="edit-emoji-${id}" value="${esc(task.emoji || '')}" />
         <input class="editor-input" type="text" id="edit-text-${id}" value="${esc(task.text)}" style="flex:1" />
       </div>
       <div class="editor-row">
@@ -771,7 +774,7 @@ async function restoreTask(id) {
   }
 }
 
-// --- Category emoji editing ---
+// --- Category emoji editing + emoji picker ---
 function getCatEmoji(id) {
   try { return JSON.parse(localStorage.getItem('catEmojis') || '{}')[id] || null; } catch { return null; }
 }
@@ -783,22 +786,54 @@ function setCatEmoji(id, emoji) {
   } catch {}
 }
 function editCatEmoji(id, defaultEmoji) {
-  const btn = document.getElementById('cat-emoji-' + id);
-  if (!btn) return;
-  const current = getCatEmoji(id) || defaultEmoji;
-  btn.outerHTML = `<input class="cat-emoji-input" id="cat-emoji-input-${id}" value="${current}" maxlength="2"
-    onblur="saveCatEmoji('${id}','${defaultEmoji}')"
-    onkeydown="if(event.key==='Enter'||event.key==='Escape'){event.preventDefault();saveCatEmoji('${id}','${defaultEmoji}')}" />`;
-  const input = document.getElementById('cat-emoji-input-' + id);
-  if (input) { input.focus(); input.select(); }
+  showEmojiPicker('cat-emoji-' + id, (emoji) => {
+    setCatEmoji(id, emoji);
+    const btn = document.getElementById('cat-emoji-' + id);
+    if (btn) btn.textContent = emoji;
+  });
 }
-function saveCatEmoji(id, defaultEmoji) {
-  const input = document.getElementById('cat-emoji-input-' + id);
-  if (!input) return;
-  const emoji = input.value.trim();
-  setCatEmoji(id, emoji);
-  const display = emoji || defaultEmoji;
-  input.outerHTML = `<button class="cat-emoji-btn" id="cat-emoji-${id}" type="button" onclick="editCatEmoji('${id}','${defaultEmoji}')" title="Click to change emoji">${display}</button>`;
+
+const EMOJI_PICKER_LIST = [
+  '🌸','💰','🏠','🚀','🐱','🎉','⭐','🎯','📝','💡',
+  '📞','📧','🛒','📅','🏥','🤝','🧹','💪','📚','🍳',
+  '💸','🎂','✈️','✍️','🔧','🌱','📋','🔑','🎁','🛡️',
+  '🍕','🎵','🏃','🧘','🌍','🚗','🏡','💊','🐕','🌊',
+  '⚽','🎮','📱','💻','📊','🧺','🪴','🎓','🎨','🌙',
+];
+
+function showEmojiPicker(anchorId, onSelect) {
+  closeEmojiPicker();
+  const anchor = document.getElementById(anchorId);
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+
+  const picker = document.createElement('div');
+  picker.id = 'emoji-picker';
+  const left = Math.min(rect.left, window.innerWidth - 232);
+  const top = rect.bottom + window.scrollY + 6;
+  picker.style.cssText = `position:absolute;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;z-index:9999;width:230px`;
+
+  EMOJI_PICKER_LIST.forEach(em => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = em;
+    btn.style.cssText = 'font-size:18px;background:none;border:none;cursor:pointer;padding:3px;border-radius:4px;line-height:1';
+    btn.onmouseenter = () => { btn.style.background = 'var(--surface2)'; };
+    btn.onmouseleave = () => { btn.style.background = 'none'; };
+    btn.onclick = (e) => { e.stopPropagation(); onSelect(em); closeEmojiPicker(); };
+    picker.appendChild(btn);
+  });
+
+  document.body.appendChild(picker);
+  setTimeout(() => document.addEventListener('click', _closePicker), 0);
+}
+function _closePicker(e) {
+  const picker = document.getElementById('emoji-picker');
+  if (picker && !picker.contains(e.target)) closeEmojiPicker();
+}
+function closeEmojiPicker() {
+  document.getElementById('emoji-picker')?.remove();
+  document.removeEventListener('click', _closePicker);
 }
 
 // --- Drag and drop ---
@@ -849,21 +884,23 @@ async function drop(event, catId) {
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
+    let finalTranscript = '';
+
     recognition.onstart = () => {
+      finalTranscript = '';
       isListening = true;
       document.getElementById('micBtn').classList.add('listening');
       setStatus('🎤 Listening... (tap mic again to stop)');
     };
 
     recognition.onresult = (event) => {
-      let finalText = '';
-      let interimText = '';
-      for (let i = 0; i < event.results.length; i++) {
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0].transcript;
-        if (event.results[i].isFinal) { finalText += text; }
-        else { interimText += text; }
+        if (event.results[i].isFinal) { finalTranscript += text; }
+        else { interimTranscript += text; }
       }
-      document.getElementById('taskInput').value = finalText || interimText;
+      document.getElementById('taskInput').value = finalTranscript + interimTranscript;
     };
 
     recognition.onend = () => {
