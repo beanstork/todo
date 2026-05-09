@@ -129,7 +129,7 @@
     .stat-pill.warning { background: var(--high-light); color: var(--high); border-color: transparent; }
 
     /* Urgent strip */
-    .urgent-strip { background: var(--urgent-light); border: 1px solid rgba(192,57,43,0.15); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 1rem; }
+    .urgent-strip { background: var(--urgent-light); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 1rem; }
     .urgent-strip-header { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; font-size: 12px; font-weight: 500; color: var(--urgent); letter-spacing: 0.02em; }
 
     /* Category section */
@@ -137,6 +137,20 @@
     .cat-header { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; padding: 0 2px; }
     .cat-emoji { font-size: 15px; }
     .cat-label { font-size: 12px; font-weight: 500; padding: 3px 10px; border-radius: 999px; letter-spacing: 0.02em; }
+    .cat-personal { background: #FBE8F0; color: #7A1E47; }
+    .cat-finance  { background: #FEF0E3; color: #7A3E10; }
+    .cat-admin    { background: #E8F0FB; color: #1A4080; }
+    .cat-projects { background: #EEEDFE; color: #3C3489; }
+    .cat-mishmish { background: #FEF4E3; color: #7A4E10; }
+    .cat-social   { background: #E3F5EE; color: #0A5038; }
+    @media (prefers-color-scheme: dark) {
+      .cat-personal { background: #3D1A2A; color: #E8A0C0; }
+      .cat-finance  { background: #3D2A10; color: #E8B880; }
+      .cat-admin    { background: #1A2840; color: #80A8E8; }
+      .cat-projects { background: #1E1D3D; color: #B0A8E8; }
+      .cat-mishmish { background: #3D2C10; color: #E8C080; }
+      .cat-social   { background: #0A2A1A; color: #80D8A8; }
+    }
     .cat-count { font-size: 12px; color: var(--text-faint); margin-left: auto; }
 
     /* Task item */
@@ -487,9 +501,9 @@
   function renderFilterPills() {
     const row = document.getElementById('filterRow');
     const pills = [
-      `<button class="filter-pill ${activeFilter === null ? 'active' : ''}" onclick="setFilter(null)">All</button>`,
+      `<button type="button" class="filter-pill ${activeFilter === null ? 'active' : ''}" onclick="setFilter(null)">All</button>`,
       ...CATEGORIES.map(c =>
-        `<button class="filter-pill ${activeFilter === c.id ? 'active' : ''}" onclick="setFilter('${c.id}')">${c.emoji} ${c.label}</button>`
+        `<button type="button" class="filter-pill ${activeFilter === c.id ? 'active' : ''}" onclick="setFilter('${c.id}')">${c.emoji} ${c.label}</button>`
       ),
     ];
     row.innerHTML = pills.join('');
@@ -535,7 +549,7 @@
     return `<div class="category-section">
       <div class="cat-header">
         <span class="cat-emoji">${cat.emoji}</span>
-        <span class="cat-label" style="background:${cat.bg};color:${cat.color}">${cat.label}</span>
+        <span class="cat-label cat-${cat.id}">${cat.label}</span>
         <span class="cat-count">${catTasks.length}</span>
       </div>
       ${catTasks.length
@@ -911,7 +925,6 @@ function cancelEdit(id) {
 
     const btn = document.getElementById('addBtn');
     btn.disabled = true;
-    input.value = '';
 
     const parsed = parseTask(raw);
 
@@ -925,8 +938,11 @@ function cancelEdit(id) {
       completed: false,
     };
 
-    await addTaskToDb(task);
-    render();
+    const ok = await addTaskToDb(task);
+    if (ok) {
+      input.value = '';
+      render();
+    }
     btn.disabled = false;
     clearStatus();
   }
