@@ -153,6 +153,21 @@
     }
     .cat-count { font-size: 12px; color: var(--text-faint); margin-left: auto; }
 
+    /* Category emoji editing */
+    .cat-emoji-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 0; border-radius: 4px; line-height: 1; }
+    .cat-emoji-btn:hover { opacity: 0.65; }
+    .cat-emoji-input { font-size: 14px; width: 34px; text-align: center; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface2); color: var(--text); padding: 2px 3px; }
+
+    /* Archive restore */
+    .archived-restore { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 14px; padding: 2px 4px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
+    .archived-item:hover .archived-restore { opacity: 1; }
+    @media (max-width: 480px) { .archived-restore { opacity: 1; } }
+
+    /* Drag and drop */
+    .task-item[draggable="true"] { cursor: grab; }
+    .task-item.dragging { opacity: 0.3; box-shadow: none; }
+    .category-section.drop-target { outline: 2px dashed var(--accent); outline-offset: 4px; border-radius: var(--radius); }
+
     /* Task item */
     .task-item {
       display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px;
@@ -321,12 +336,11 @@
 
   // === DATA ===
   const CATEGORIES = [
-    { id: 'personal',  label: 'Personal life',     emoji: '🌸', bg: '#FBE8F0', color: '#7A1E47' },
-    { id: 'finance',   label: 'Finance',           emoji: '💰', bg: '#FEF0E3', color: '#7A3E10' },
-    { id: 'admin',     label: 'Life admin',        emoji: '🏠', bg: '#E8F0FB', color: '#1A4080' },
-    { id: 'projects',  label: 'Personal projects', emoji: '🚀', bg: '#EEEDFE', color: '#3C3489' },
-    { id: 'mishmish',  label: 'Mishmish',          emoji: '🐱', bg: '#FEF4E3', color: '#7A4E10' },
-    { id: 'social',    label: 'Social',            emoji: '🎉', bg: '#E3F5EE', color: '#0A5038' },
+    { id: 'finance',   label: 'Finance',           emoji: '💰' },
+    { id: 'admin',     label: 'Life admin',        emoji: '🏠' },
+    { id: 'projects',  label: 'Personal projects', emoji: '🚀' },
+    { id: 'mishmish',  label: 'Mishmish',          emoji: '🐱' },
+    { id: 'social',    label: 'Social',            emoji: '🎉' },
   ];
 
   // === STATE ===
@@ -339,6 +353,7 @@
   let isListening = false;
   let recognition = null;
   let editingId = null;
+  let draggedId = null;
 
   // === SUPABASE CLIENT ===
   const { createClient } = supabase;
@@ -357,6 +372,12 @@
     try {
       const { data, error } = await db.from('tasks').select('*').order('created_at', { ascending: true });
       if (error) throw error;
+      // Migrate old 'personal' category → 'admin'
+      const personalIds = data.filter(t => t.category === 'personal').map(t => t.id);
+      if (personalIds.length) {
+        await db.from('tasks').update({ category: 'admin' }).in('id', personalIds);
+        data.forEach(t => { if (t.category === 'personal') t.category = 'admin'; });
+      }
       tasks = data.filter(t => !t.completed);
       archived = data.filter(t => t.completed);
       await purgeOldArchive();
@@ -546,9 +567,11 @@
 
   function renderCategorySection(cat) {
     const catTasks = sortTasks(tasks.filter(t => t.category === cat.id));
-    return `<div class="category-section">
+    const emoji = getCatEmoji(cat.id) || cat.emoji;
+    return `<div class="category-section" id="cs-${cat.id}"
+      ondragover="dragOver(event,'${cat.id}')" ondragleave="dragLeave(event,'${cat.id}')" ondrop="drop(event,'${cat.id}')">
       <div class="cat-header">
-        <span class="cat-emoji">${cat.emoji}</span>
+        <button class="cat-emoji-btn" id="cat-emoji-${cat.id}" type="button" onclick="editCatEmoji('${cat.id}','${cat.emoji}')" title="Click to change emoji">${emoji}</button>
         <span class="cat-label cat-${cat.id}">${cat.label}</span>
         <span class="cat-count">${catTasks.length}</span>
       </div>
@@ -562,7 +585,8 @@
     const priorityCls = isUrgent(task) ? 'is-urgent' : isHigh(task) ? 'is-high' : '';
     const due = task.due ? formatDue(task.due) : null;
     const id = task.id;
-    return `<div class="task-item ${priorityCls}" id="ti-${id}">
+    return `<div class="task-item ${priorityCls}" id="ti-${id}" draggable="true"
+      ondragstart="dragStart(event,'${id}')" ondragend="dragEnd(event,'${id}')">
       <button class="task-check" onclick="completeTask('${id}')" aria-label="Mark complete" type="button"></button>
       <div class="task-body" onclick="startEdit('${id}')">
         <div class="task-text">${task.emoji ? esc(task.emoji) + ' ' : ''}${esc(task.text)}</div>
@@ -588,6 +612,7 @@
       sec.innerHTML = [...archived].reverse().slice(0, 50).map(t =>
         `<div class="archived-item">
           <span class="archived-text">${t.emoji ? esc(t.emoji) + ' ' : ''}${esc(t.text)}</span>
+          <button class="archived-restore" type="button" onclick="restoreTask('${t.id}')" title="Restore task">↩</button>
           <button class="archived-del" onclick="deleteArchived('${t.id}')" type="button">✕</button>
         </div>`
       ).join('');
@@ -683,7 +708,10 @@ function startEdit(id) {
 
   item.querySelector('.task-body').insertAdjacentHTML('beforeend', `
     <div class="task-editor" id="editor-${id}">
-      <input class="editor-input" type="text" id="edit-text-${id}" value="${esc(task.text)}" />
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="editor-input" type="text" id="edit-emoji-${id}" value="${esc(task.emoji || '')}" placeholder="emoji" style="width:52px;text-align:center" maxlength="2" />
+        <input class="editor-input" type="text" id="edit-text-${id}" value="${esc(task.text)}" style="flex:1" />
+      </div>
       <div class="editor-row">
         <select class="editor-select" id="edit-cat-${id}">${catOptions}</select>
         <select class="editor-select" id="edit-priority-${id}">
@@ -708,6 +736,7 @@ async function saveEdit(id) {
   if (!text) return;
   const updates = {
     text,
+    emoji: document.getElementById('edit-emoji-' + id)?.value.trim() || null,
     category: document.getElementById('edit-cat-' + id)?.value,
     priority: document.getElementById('edit-priority-' + id)?.value,
     due: document.getElementById('edit-due-' + id)?.value || null,
@@ -727,6 +756,82 @@ function cancelEdit(id) {
   editingId = null;
 }
 
+// --- Restore from archive ---
+async function restoreTask(id) {
+  const ok = await updateTaskInDb(id, { completed: false, completed_at: null });
+  if (ok) {
+    const task = archived.find(t => t.id === id);
+    if (task) {
+      task.completed = false;
+      task.completed_at = null;
+      archived = archived.filter(t => t.id !== id);
+      tasks.push(task);
+    }
+    render();
+  }
+}
+
+// --- Category emoji editing ---
+function getCatEmoji(id) {
+  try { return JSON.parse(localStorage.getItem('catEmojis') || '{}')[id] || null; } catch { return null; }
+}
+function setCatEmoji(id, emoji) {
+  try {
+    const stored = JSON.parse(localStorage.getItem('catEmojis') || '{}');
+    if (emoji) stored[id] = emoji; else delete stored[id];
+    localStorage.setItem('catEmojis', JSON.stringify(stored));
+  } catch {}
+}
+function editCatEmoji(id, defaultEmoji) {
+  const btn = document.getElementById('cat-emoji-' + id);
+  if (!btn) return;
+  const current = getCatEmoji(id) || defaultEmoji;
+  btn.outerHTML = `<input class="cat-emoji-input" id="cat-emoji-input-${id}" value="${current}" maxlength="2"
+    onblur="saveCatEmoji('${id}','${defaultEmoji}')"
+    onkeydown="if(event.key==='Enter'||event.key==='Escape'){event.preventDefault();saveCatEmoji('${id}','${defaultEmoji}')}" />`;
+  const input = document.getElementById('cat-emoji-input-' + id);
+  if (input) { input.focus(); input.select(); }
+}
+function saveCatEmoji(id, defaultEmoji) {
+  const input = document.getElementById('cat-emoji-input-' + id);
+  if (!input) return;
+  const emoji = input.value.trim();
+  setCatEmoji(id, emoji);
+  const display = emoji || defaultEmoji;
+  input.outerHTML = `<button class="cat-emoji-btn" id="cat-emoji-${id}" type="button" onclick="editCatEmoji('${id}','${defaultEmoji}')" title="Click to change emoji">${display}</button>`;
+}
+
+// --- Drag and drop ---
+function dragStart(event, id) {
+  draggedId = id;
+  event.dataTransfer.effectAllowed = 'move';
+  setTimeout(() => document.getElementById('ti-' + id)?.classList.add('dragging'), 0);
+}
+function dragEnd(event, id) {
+  document.getElementById('ti-' + id)?.classList.remove('dragging');
+  draggedId = null;
+}
+function dragOver(event, catId) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  document.getElementById('cs-' + catId)?.classList.add('drop-target');
+}
+function dragLeave(event, catId) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    document.getElementById('cs-' + catId)?.classList.remove('drop-target');
+  }
+}
+async function drop(event, catId) {
+  event.preventDefault();
+  document.getElementById('cs-' + catId)?.classList.remove('drop-target');
+  if (!draggedId) return;
+  const task = tasks.find(t => t.id === draggedId);
+  if (!task || task.category === catId) { draggedId = null; return; }
+  const ok = await updateTaskInDb(draggedId, { category: catId });
+  if (ok) { task.category = catId; render(); }
+  draggedId = null;
+}
+
   // === VOICE INPUT ===
   function toggleListening() {
     if (isListening) { stopListening(); } else { startListening(); }
@@ -740,7 +845,7 @@ function cancelEdit(id) {
       return;
     }
     recognition = new SpeechRec();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = true;
     recognition.lang = 'en-US';
 
@@ -751,11 +856,14 @@ function cancelEdit(id) {
     };
 
     recognition.onresult = (event) => {
-      let transcript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        transcript += event.results[i][0].transcript;
+      let finalText = '';
+      let interimText = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const text = event.results[i][0].transcript;
+        if (event.results[i].isFinal) { finalText += text; }
+        else { interimText += text; }
       }
-      document.getElementById('taskInput').value = transcript;
+      document.getElementById('taskInput').value = finalText || interimText;
     };
 
     recognition.onend = () => {
@@ -857,7 +965,7 @@ function cancelEdit(id) {
 
     // --- Category detection ---
     const l = cleanText.toLowerCase();
-    let category = 'personal';
+    let category = 'admin';
 
     if (/mishmish|\bcat\b|\bkitten\b|\bvaccinat|\bvet\b|\bcat food\b|\bcat litter\b/i.test(l)) {
       category = 'mishmish';
