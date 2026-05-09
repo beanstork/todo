@@ -796,9 +796,9 @@ function editCatEmoji(id, defaultEmoji) {
 const EMOJI_PICKER_LIST = [
   '🌸','💰','🏠','🚀','🐱','🎉','⭐','🎯','📝','💡',
   '📞','📧','🛒','📅','🏥','🤝','🧹','💪','📚','🍳',
-  '💸','🎂','✈️','✍️','🔧','🌱','📋','🔑','🎁','🛡️',
-  '🍕','🎵','🏃','🧘','🌍','🚗','🏡','💊','🐕','🌊',
-  '⚽','🎮','📱','💻','📊','🧺','🪴','🎓','🎨','🌙',
+  '💸','🎂','✈️','✍️','🔧','🌱','📋','🔑','🎁','🛡',
+  '🍕','🎵','🏃','🌍','🚗','🏡','💊','🐕','🌊','🌿',
+  '⚽','🎮','📱','💻','📊','🎒','🌵','🎓','🎨','🌙',
 ];
 
 function showEmojiPicker(anchorId, onSelect) {
@@ -809,9 +809,12 @@ function showEmojiPicker(anchorId, onSelect) {
 
   const picker = document.createElement('div');
   picker.id = 'emoji-picker';
-  const left = Math.min(rect.left, window.innerWidth - 232);
-  const top = rect.bottom + window.scrollY + 6;
-  picker.style.cssText = `position:absolute;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;z-index:9999;width:230px`;
+  const pickerW = 232;
+  const pickerH = 130; // approximate
+  const left = Math.min(Math.max(4, rect.left), window.innerWidth - pickerW - 4);
+  const spaceBelow = window.innerHeight - rect.bottom - 8;
+  const top = spaceBelow >= pickerH ? rect.bottom + 6 : rect.top - pickerH - 6;
+  picker.style.cssText = `position:fixed;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;z-index:9999;width:${pickerW}px`;
 
   EMOJI_PICKER_LIST.forEach(em => {
     const btn = document.createElement('button');
@@ -882,7 +885,8 @@ async function drop(event, catId) {
     recognition = new SpeechRec();
     recognition.continuous = true;
     recognition.interimResults = true;
-    recognition.lang = 'en-US';
+    recognition.lang = navigator.language || 'en-US';
+    recognition.maxAlternatives = 1;
 
     let finalTranscript = '';
 
@@ -890,34 +894,50 @@ async function drop(event, catId) {
       finalTranscript = '';
       isListening = true;
       document.getElementById('micBtn').classList.add('listening');
-      setStatus('🎤 Listening... (tap mic again to stop)');
+      setStatus('🎤 Listening...');
     };
+
+    recognition.onsoundstart = () => setStatus('🎤 Sound detected...');
+    recognition.onspeechstart = () => setStatus('🎤 Hearing you...');
+    recognition.onspeechend  = () => setStatus('🎤 Processing...');
 
     recognition.onresult = (event) => {
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const text = event.results[i][0].transcript;
-        if (event.results[i].isFinal) { finalTranscript += text; }
+        if (event.results[i].isFinal) { finalTranscript += text + ' '; }
         else { interimTranscript += text; }
       }
-      document.getElementById('taskInput').value = finalTranscript + interimTranscript;
+      document.getElementById('taskInput').value = (finalTranscript + interimTranscript).trim();
+      setStatus('🎤 Listening...');
     };
 
     recognition.onend = () => {
-      isListening = false;
+      // With continuous:true, onend firing means Chrome ended the session unexpectedly.
+      // Restart it as long as the user hasn't stopped manually.
+      if (isListening) {
+        try { recognition.start(); } catch (_) {}
+        return;
+      }
       document.getElementById('micBtn').classList.remove('listening');
       clearStatus();
       recognition = null;
     };
 
     recognition.onerror = (e) => {
+      if (e.error === 'no-speech') {
+        // Normal with continuous mode — Chrome timed out waiting for speech.
+        // onend will fire next and restart us automatically.
+        setStatus('🎤 Listening...');
+        return;
+      }
       isListening = false;
       document.getElementById('micBtn').classList.remove('listening');
       const msg = e.error === 'not-allowed'
         ? 'Microphone access denied — check browser permissions'
-        : 'Voice input error: ' + e.error;
+        : 'Voice error: ' + e.error;
       setStatus(msg);
-      setTimeout(clearStatus, 4000);
+      setTimeout(clearStatus, 5000);
       recognition = null;
     };
 
