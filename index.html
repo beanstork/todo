@@ -592,10 +592,6 @@
     renderArchiveToggle();
   }
 
-  function renderCalendar() {
-    // Implemented in Task 9
-  }
-
   // === TASK INTERACTIONS ===
 
 // --- Complete ---
@@ -939,7 +935,134 @@ function cancelEdit(id) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAdd(); }
   });
   // === VIEW SWITCHING ===
+  function switchView(view) {
+    activeView = view;
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+    document.getElementById('listView').style.display = view === 'list' ? 'block' : 'none';
+    document.getElementById('calendarView').style.display = view === 'calendar' ? 'block' : 'none';
+    if (view === 'calendar') renderCalendar();
+  }
+
   // === CALENDAR ===
+  function renderCalendar() {
+    const grid = document.getElementById('calendarGrid');
+    const year = calendarDate.getFullYear();
+    const month = calendarDate.getMonth();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const monthName = calendarDate.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startDow = (firstDay.getDay() + 6) % 7; // Monday-first
+
+    // Build tasksByDate map
+    const tasksByDate = {};
+    tasks.forEach(t => {
+      if (t.due) {
+        if (!tasksByDate[t.due]) tasksByDate[t.due] = [];
+        tasksByDate[t.due].push(t);
+      }
+    });
+
+    const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+    let html = `
+      <div class="calendar-nav">
+        <button type="button" onclick="calPrev()">‹</button>
+        <span class="calendar-month">${monthName}</span>
+        <button type="button" onclick="calNext()">›</button>
+      </div>
+      <div class="calendar-grid">
+        ${dayLabels.map(d => `<div class="calendar-day-header">${d}</div>`).join('')}`;
+
+    // Blank cells before month start
+    for (let i = 0; i < startDow; i++) {
+      html += `<div class="calendar-day other-month"></div>`;
+    }
+
+    for (let d = 1; d <= lastDay.getDate(); d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const dayDate = new Date(year, month, d);
+      const isToday = dayDate.getTime() === today.getTime();
+      const dayTasks = tasksByDate[dateStr] || [];
+      const hasOverdue = dayDate < today && dayTasks.length > 0;
+      const isSelected = selectedCalendarDay === dateStr;
+
+      const cls = [
+        'calendar-day',
+        isToday ? 'today' : '',
+        isSelected ? 'selected' : '',
+      ].filter(Boolean).join(' ');
+
+      const dot = dayTasks.length
+        ? `<div class="day-dot${hasOverdue ? ' urgent' : ''}"></div>`
+        : '';
+
+      html += `<div class="${cls}" onclick="selectCalDay('${dateStr}')">
+        <span class="day-num">${d}</span>
+        ${dot}
+      </div>`;
+    }
+
+    // Pad remaining cells
+    const total = startDow + lastDay.getDate();
+    const rem = total % 7;
+    if (rem > 0) {
+      for (let i = 0; i < 7 - rem; i++) {
+        html += `<div class="calendar-day other-month"></div>`;
+      }
+    }
+
+    html += `</div>`;
+    grid.innerHTML = html;
+
+    renderCalendarPanel(tasksByDate);
+  }
+
+  function selectCalDay(dateStr) {
+    selectedCalendarDay = selectedCalendarDay === dateStr ? null : dateStr;
+    renderCalendar();
+  }
+
+  function renderCalendarPanel(tasksByDate) {
+    const panel = document.getElementById('calendarDayPanel');
+    if (!selectedCalendarDay) { panel.innerHTML = ''; return; }
+
+    const dayTasks = tasksByDate[selectedCalendarDay] || [];
+    const d = new Date(selectedCalendarDay + 'T00:00:00');
+    const label = d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    panel.innerHTML = `
+      <div class="calendar-panel">
+        <div class="calendar-panel-title">${label}</div>
+        ${dayTasks.length
+          ? dayTasks.map(t => `
+              <div class="task-item ${isUrgent(t) ? 'is-urgent' : isHigh(t) ? 'is-high' : ''}" style="margin-bottom:6px;cursor:default">
+                <div class="task-body" style="cursor:default">
+                  <div class="task-text">${t.emoji ? esc(t.emoji) + ' ' : ''}${esc(t.text)}</div>
+                  ${t.priority && t.priority !== 'normal'
+                    ? `<div class="task-meta"><span class="priority-badge p-${t.priority}">${t.priority}</span></div>`
+                    : ''}
+                </div>
+              </div>`).join('')
+          : `<p style="color:var(--text-faint);font-size:13px;font-style:italic">No tasks due this day</p>`
+        }
+      </div>`;
+  }
+
+  function calPrev() {
+    calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1);
+    selectedCalendarDay = null;
+    renderCalendar();
+  }
+
+  function calNext() {
+    calendarDate = new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1);
+    selectedCalendarDay = null;
+    renderCalendar();
+  }
+
   // === INIT ===
 loadTasks();
 
