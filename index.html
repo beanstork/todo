@@ -349,6 +349,7 @@
       setSyncStatus('synced');
       document.getElementById('errorState').style.display = 'none';
       document.getElementById('listView').style.display = 'block';
+      render();
     } catch (e) {
       setSyncStatus('error');
       document.getElementById('errorState').style.display = 'block';
@@ -357,7 +358,6 @@
     } finally {
       document.getElementById('loadingScreen').style.display = 'none';
     }
-    render();
   }
 
   async function addTaskToDb(task) {
@@ -370,8 +370,7 @@
       return true;
     } catch (e) {
       setSyncStatus('error');
-      tasks.push({ ...task, id: 'local_' + Date.now() });
-      setStatus('Saved locally — sync failed');
+      setStatus('Failed to save — check your connection');
       return false;
     }
   }
@@ -462,7 +461,9 @@
       if (da !== null) return -1;
       if (db2 !== null) return 1;
       const po = { urgent: 0, high: 1, normal: 2 };
-      return (po[a.priority] || 2) - (po[b.priority] || 2);
+      const pd = (po[a.priority] || 2) - (po[b.priority] || 2);
+      if (pd !== 0) return pd;
+      return new Date(a.created_at) - new Date(b.created_at);
     });
   }
 
