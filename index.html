@@ -598,6 +598,60 @@
 
   // === TASK INTERACTIONS ===
   // === VOICE INPUT ===
+  function toggleListening() {
+    if (isListening) { stopListening(); } else { startListening(); }
+  }
+
+  function startListening() {
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRec) {
+      setStatus('Voice input not supported in this browser');
+      setTimeout(clearStatus, 3000);
+      return;
+    }
+    recognition = new SpeechRec();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      isListening = true;
+      document.getElementById('micBtn').classList.add('listening');
+      setStatus('🎤 Listening... (tap mic again to stop)');
+    };
+
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        transcript += event.results[i][0].transcript;
+      }
+      document.getElementById('taskInput').value = transcript;
+    };
+
+    recognition.onend = () => {
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('listening');
+      clearStatus();
+      recognition = null;
+    };
+
+    recognition.onerror = (e) => {
+      isListening = false;
+      document.getElementById('micBtn').classList.remove('listening');
+      const msg = e.error === 'not-allowed'
+        ? 'Microphone access denied — check browser permissions'
+        : 'Voice input error: ' + e.error;
+      setStatus(msg);
+      setTimeout(clearStatus, 4000);
+      recognition = null;
+    };
+
+    recognition.start();
+  }
+
+  function stopListening() {
+    if (recognition) recognition.stop();
+  }
   // === PARSER ===
   function parseTask(raw) {
     const text = raw.trim();
