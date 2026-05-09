@@ -809,13 +809,13 @@ function showEmojiPicker(anchorId, onSelect) {
 
   const picker = document.createElement('div');
   picker.id = 'emoji-picker';
-  const pickerW = 232;
-  const pickerH = 180; // 5 rows × ~30px + 16px padding
+  const pickerW = 190;
+  const pickerH = 170; // 6 rows × ~26px + 16px padding
   const left = Math.min(Math.max(4, rect.left), window.innerWidth - pickerW - 4);
   const spaceBelow = window.innerHeight - rect.bottom - 8;
   let top = spaceBelow >= pickerH ? rect.bottom + 6 : rect.top - pickerH - 6;
   top = Math.max(4, Math.min(top, window.innerHeight - pickerH - 4)); // hard clamp to viewport
-  picker.style.cssText = `position:fixed;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;z-index:9999;width:${pickerW}px`;
+  picker.style.cssText = `position:fixed;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(8,1fr);gap:2px;z-index:9999;width:${pickerW}px;max-height:160px;overflow-y:auto`;
 
   EMOJI_PICKER_LIST.forEach(em => {
     const btn = document.createElement('button');
@@ -982,6 +982,16 @@ async function drop(event, catId) {
       [/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, (m) => toYMD(nextWeekday(m[1].toLowerCase()))],
       [/\bend of (the )?week\b/i, () => toYMD(nextWeekday('friday'))],
       [/\bend of (the )?month\b/i, () => { const d = new Date(today.getFullYear(), today.getMonth()+1, 0); return toYMD(d); }],
+      [/\b(next |this )?(weekend)\b/i, () => toYMD(nextWeekday('saturday'))],
+      [/\bnext month\b/i, () => toYMD(new Date(today.getFullYear(), today.getMonth() + 1, 1))],
+      [/\bend of (the )?year\b/i, () => { const d = new Date(today.getFullYear(), 11, 31); return d >= today ? toYMD(d) : toYMD(new Date(today.getFullYear() + 1, 11, 31)); }],
+      [/\bend of (january|february|march|april|may|june|july|august|september|october|november|december)\b/i, (m) => {
+        const monMap = {january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+        const mo = monMap[m[1].toLowerCase()]; let yr = today.getFullYear();
+        let d = new Date(yr, mo + 1, 0);
+        if (d < today) { yr++; d = new Date(yr, mo + 1, 0); }
+        return toYMD(d);
+      }],
       [/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/, (m) => {
         const yr = m[3] ? (m[3].length===2 ? 2000+parseInt(m[3]) : parseInt(m[3])) : today.getFullYear();
         const d = new Date(yr, parseInt(m[1])-1, parseInt(m[2]));
