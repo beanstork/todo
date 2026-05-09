@@ -597,6 +597,126 @@
   }
 
   // === TASK INTERACTIONS ===
+
+// --- Complete ---
+async function completeTask(id) {
+  const item = document.getElementById('ti-' + id);
+  if (!item || item.classList.contains('completing')) return;
+
+  // Ripple rings from checkbox
+  const check = item.querySelector('.task-check');
+  const ring1 = document.createElement('span');
+  const ring2 = document.createElement('span');
+  ring1.className = 'ripple-ring';
+  ring2.className = 'ripple-ring ripple-ring-2';
+  check.appendChild(ring1);
+  check.appendChild(ring2);
+
+  // Strikethrough + slide out
+  item.classList.add('completing');
+
+  const now = new Date().toISOString();
+  await updateTaskInDb(id, { completed: true, completed_at: now });
+
+  setTimeout(() => {
+    const t = tasks.find(t => t.id === id);
+    if (t) { t.completed = true; t.completed_at = now; }
+    tasks = tasks.filter(t => t.id !== id);
+    if (t) archived.push(t);
+    render();
+  }, 820);
+}
+
+// --- Delete ---
+function showDeleteConfirm(event, id) {
+  event.stopPropagation();
+  const item = document.getElementById('ti-' + id);
+  if (!item) return;
+  const deleteBtn = item.querySelector('.task-delete');
+  if (!deleteBtn) return;
+  deleteBtn.outerHTML = `<div class="delete-confirm" id="dc-${id}">
+    <span style="font-style:italic;font-size:12px;color:var(--text-faint)">Delete?</span>
+    <button class="confirm-yes" type="button" onclick="confirmDelete(event,'${id}')">Yes</button>
+    <button class="confirm-cancel" type="button" onclick="cancelDelete(event,'${id}')">Cancel</button>
+  </div>`;
+}
+
+function cancelDelete(event, id) {
+  event.stopPropagation();
+  const confirm = document.getElementById('dc-' + id);
+  if (confirm) {
+    confirm.outerHTML = `<button class="task-delete" type="button" onclick="showDeleteConfirm(event,'${id}')" aria-label="Delete">✕</button>`;
+  }
+}
+
+async function confirmDelete(event, id) {
+  event.stopPropagation();
+  await deleteTaskFromDb(id);
+  tasks = tasks.filter(t => t.id !== id);
+  render();
+}
+
+// --- Edit ---
+function startEdit(id) {
+  if (editingId === id) return;
+  if (editingId) cancelEdit(editingId);
+  editingId = id;
+
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const item = document.getElementById('ti-' + id);
+  if (!item) return;
+
+  const catOptions = CATEGORIES.map(c =>
+    `<option value="${c.id}" ${task.category === c.id ? 'selected' : ''}>${c.emoji} ${c.label}</option>`
+  ).join('');
+
+  item.querySelector('.task-body').insertAdjacentHTML('beforeend', `
+    <div class="task-editor" id="editor-${id}">
+      <input class="editor-input" type="text" id="edit-text-${id}" value="${esc(task.text)}" />
+      <div class="editor-row">
+        <select class="editor-select" id="edit-cat-${id}">${catOptions}</select>
+        <select class="editor-select" id="edit-priority-${id}">
+          <option value="normal" ${(!task.priority || task.priority === 'normal') ? 'selected' : ''}>Normal</option>
+          <option value="high" ${task.priority === 'high' ? 'selected' : ''}>High</option>
+          <option value="urgent" ${task.priority === 'urgent' ? 'selected' : ''}>Urgent</option>
+        </select>
+      </div>
+      <input class="editor-input" type="date" id="edit-due-${id}" value="${task.due || ''}" />
+      <textarea class="editor-notes" id="edit-notes-${id}" placeholder="Notes...">${esc(task.notes || '')}</textarea>
+      <div class="editor-actions">
+        <button class="editor-save" type="button" onclick="saveEdit('${id}')">Save</button>
+        <button class="editor-cancel" type="button" onclick="cancelEdit('${id}')">Cancel</button>
+      </div>
+    </div>`);
+
+  document.getElementById('edit-text-' + id)?.focus();
+}
+
+async function saveEdit(id) {
+  const text = document.getElementById('edit-text-' + id)?.value.trim();
+  if (!text) return;
+  const updates = {
+    text,
+    category: document.getElementById('edit-cat-' + id)?.value,
+    priority: document.getElementById('edit-priority-' + id)?.value,
+    due: document.getElementById('edit-due-' + id)?.value || null,
+    notes: document.getElementById('edit-notes-' + id)?.value.trim() || null,
+  };
+  const ok = await updateTaskInDb(id, updates);
+  if (ok) {
+    const task = tasks.find(t => t.id === id);
+    if (task) Object.assign(task, updates);
+    editingId = null;
+    render();
+  }
+}
+
+function cancelEdit(id) {
+  document.getElementById('editor-' + id)?.remove();
+  editingId = null;
+}
+
   // === VOICE INPUT ===
   function toggleListening() {
     if (isListening) { stopListening(); } else { startListening(); }
