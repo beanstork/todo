@@ -28,6 +28,7 @@
       --radius-sm: 8px;
       --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
       --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --header-h: 57px;
     }
 
     @media (prefers-color-scheme: dark) {
@@ -63,7 +64,7 @@
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
     /* Header */
-    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; position: sticky; top: 0; z-index: 100; }
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; position: sticky; top: 0; z-index: 100; height: var(--header-h); display: flex; align-items: center; }
     .header-inner { max-width: 680px; margin: 0 auto; display: flex; align-items: center; gap: 12px; }
     .logo { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text); flex: 1; }
     .logo span { color: var(--accent); }
@@ -80,7 +81,7 @@
     .sync-dot.error { background: var(--urgent); }
 
     /* Input wrapper */
-    .input-wrapper { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; position: sticky; top: 57px; z-index: 99; }
+    .input-wrapper { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0.75rem 1.5rem; position: sticky; top: var(--header-h); z-index: 99; }
     .input-card { max-width: 680px; margin: 0 auto; }
     .input-row { display: flex; gap: 8px; align-items: flex-end; }
     textarea#taskInput {
@@ -142,11 +143,12 @@
     .task-item {
       display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px;
       background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
-      margin-bottom: 6px; transition: border-color 0.15s, box-shadow 0.15s; position: relative; overflow: hidden;
+      margin-bottom: 6px; transition: border-color 0.15s, box-shadow 0.15s; position: relative;
     }
     .task-item:hover { border-color: var(--border-strong); box-shadow: var(--shadow); }
     .task-item.is-urgent { border-left: 3px solid var(--urgent); }
     .task-item.is-high { border-left: 3px solid var(--high); }
+    .task-item.completing { overflow: hidden; }
 
     /* Checkbox + ripple */
     .task-check {
@@ -164,7 +166,7 @@
     .task-item.completing .task-text { text-decoration: line-through; color: var(--text-faint); transition: color 0.2s; }
     .task-item.completing { animation: slideOut 0.45s ease-in forwards; animation-delay: 0.35s; }
     @keyframes slideOut {
-      from { transform: translateX(0); opacity: 1; max-height: 200px; margin-bottom: 6px; padding-top: 11px; padding-bottom: 11px; }
+      from { transform: translateX(0); opacity: 1; max-height: 400px; margin-bottom: 6px; padding-top: 11px; padding-bottom: 11px; }
       to { transform: translateX(50px); opacity: 0; max-height: 0; margin-bottom: 0; padding-top: 0; padding-bottom: 0; }
     }
 
@@ -194,7 +196,8 @@
 
     /* Delete button + confirm */
     .task-delete { background: none; border: none; cursor: pointer; color: var(--text-faint); font-size: 16px; padding: 2px 4px; border-radius: 4px; line-height: 1; transition: color 0.15s, opacity 0.15s; flex-shrink: 0; opacity: 0; }
-    .task-item:hover .task-delete { opacity: 1; }
+    .task-item:hover .task-delete,
+    .task-item:focus-within .task-delete { opacity: 1; }
     .task-delete:hover { color: var(--urgent); }
     .delete-confirm { font-size: 13px; color: var(--text-muted); display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .delete-confirm button { font-family: 'DM Sans', sans-serif; font-size: 13px; background: none; border: none; cursor: pointer; padding: 2px 4px; border-radius: 4px; }
@@ -210,7 +213,8 @@
     .archived-item { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: var(--radius-sm); margin-bottom: 4px; opacity: 0.5; }
     .archived-text { font-size: 13px; color: var(--text-muted); text-decoration: line-through; flex: 1; }
     .archived-del { background: none; border: none; color: var(--text-faint); cursor: pointer; font-size: 14px; padding: 2px; opacity: 0; }
-    .archived-item:hover .archived-del { opacity: 1; }
+    .archived-item:hover .archived-del,
+    .archived-item:focus-within .archived-del { opacity: 1; }
 
     /* Error state */
     .error-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
@@ -235,8 +239,9 @@
 
     /* Mobile */
     @media (max-width: 480px) {
+      :root { --header-h: 52px; }
       header { padding: 0.875rem 1rem; }
-      .input-wrapper { padding: 0.625rem 0.875rem; top: 52px; }
+      .input-wrapper { padding: 0.625rem 0.875rem; top: var(--header-h); }
       main { padding: 1rem 0.75rem 4rem; }
       .logo { font-size: 18px; }
       .task-delete { opacity: 1; }
@@ -255,9 +260,9 @@
 <header>
   <div class="header-inner">
     <div class="logo">my <span>tasks</span></div>
-    <nav class="view-tabs">
-      <button class="tab-btn active" data-view="list" onclick="switchView('list')">List</button>
-      <button class="tab-btn" data-view="calendar" onclick="switchView('calendar')">Calendar</button>
+    <nav class="view-tabs" aria-label="View">
+      <button type="button" class="tab-btn active" data-view="list" onclick="switchView('list')">List</button>
+      <button type="button" class="tab-btn" data-view="calendar" onclick="switchView('calendar')">Calendar</button>
     </nav>
     <div class="sync-dot" id="syncDot" title="Sync status"></div>
   </div>
@@ -267,8 +272,8 @@
   <div class="input-card">
     <div class="input-row">
       <textarea id="taskInput" placeholder="Add a task... e.g. 'call the vet about Mishmish booster next Tuesday'" rows="2"></textarea>
-      <button class="mic-btn" id="micBtn" onclick="toggleListening()" aria-label="Voice input">🎤</button>
-      <button class="add-btn" id="addBtn" onclick="handleAdd()">✦ Add</button>
+      <button type="button" class="mic-btn" id="micBtn" onclick="toggleListening()" aria-label="Voice input">🎤</button>
+      <button type="button" class="add-btn" id="addBtn" onclick="handleAdd()">✦ Add</button>
     </div>
     <div class="ai-status" id="aiStatus"></div>
   </div>
@@ -280,7 +285,7 @@
     <div class="stats-row" id="statsRow"></div>
     <div id="urgentStrip"></div>
     <div id="taskList"></div>
-    <button class="archive-toggle" id="archiveToggle" onclick="toggleArchive()"></button>
+    <button type="button" class="archive-toggle" id="archiveToggle" onclick="toggleArchive()"></button>
     <div class="archive-section" id="archiveSection" style="display:none"></div>
   </div>
 
@@ -291,7 +296,7 @@
 
   <div id="errorState" style="display:none" class="error-state">
     <p>Couldn't connect to Supabase.</p>
-    <button onclick="loadTasks()">Retry</button>
+    <button type="button" onclick="loadTasks()">Retry</button>
   </div>
 </main>
 
