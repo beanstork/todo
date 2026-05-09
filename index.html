@@ -472,6 +472,130 @@
   }
 
   // === RENDERING ===
+  function render() {
+    if (activeView === 'list') {
+      renderFilterPills();
+      renderStats();
+      renderUrgentStrip();
+      renderTaskList();
+      renderArchiveToggle();
+    } else {
+      renderCalendar();
+    }
+  }
+
+  function renderFilterPills() {
+    const row = document.getElementById('filterRow');
+    const pills = [
+      `<button class="filter-pill ${activeFilter === null ? 'active' : ''}" onclick="setFilter(null)">All</button>`,
+      ...CATEGORIES.map(c =>
+        `<button class="filter-pill ${activeFilter === c.id ? 'active' : ''}" onclick="setFilter('${c.id}')">${c.emoji} ${c.label}</button>`
+      ),
+    ];
+    row.innerHTML = pills.join('');
+  }
+
+  function setFilter(catId) {
+    activeFilter = catId;
+    render();
+  }
+
+  function renderStats() {
+    const visible = activeFilter ? tasks.filter(t => t.category === activeFilter) : tasks;
+    const overdue = visible.filter(t => { const d = getDaysUntil(t.due); return d !== null && d < 0; }).length;
+    const soon = visible.filter(t => { const d = getDaysUntil(t.due); return d !== null && d >= 0 && d <= 3; }).length;
+    let html = `<span class="stat-pill">${visible.length} active</span>`;
+    if (overdue) html += `<span class="stat-pill danger">${overdue} overdue</span>`;
+    if (soon) html += `<span class="stat-pill warning">${soon} due soon</span>`;
+    document.getElementById('statsRow').innerHTML = html;
+  }
+
+  function renderUrgentStrip() {
+    const strip = document.getElementById('urgentStrip');
+    const urgentTasks = tasks.filter(t => {
+      if (activeFilter && t.category !== activeFilter) return false;
+      return isUrgent(t);
+    });
+    if (!urgentTasks.length) { strip.innerHTML = ''; return; }
+    strip.innerHTML = `
+      <div class="urgent-strip">
+        <div class="urgent-strip-header">🔴 Urgent &amp; Overdue</div>
+        ${sortTasks(urgentTasks).map(t => renderTaskItem(t)).join('')}
+      </div>`;
+  }
+
+  function renderTaskList() {
+    const list = document.getElementById('taskList');
+    const cats = activeFilter ? CATEGORIES.filter(c => c.id === activeFilter) : CATEGORIES;
+    list.innerHTML = cats.map(cat => renderCategorySection(cat)).join('');
+  }
+
+  function renderCategorySection(cat) {
+    const catTasks = sortTasks(tasks.filter(t => t.category === cat.id));
+    return `<div class="category-section">
+      <div class="cat-header">
+        <span class="cat-emoji">${cat.emoji}</span>
+        <span class="cat-label" style="background:${cat.bg};color:${cat.color}">${cat.label}</span>
+        <span class="cat-count">${catTasks.length}</span>
+      </div>
+      ${catTasks.length
+        ? catTasks.map(t => renderTaskItem(t)).join('')
+        : '<div class="empty-cat">Nothing here</div>'}
+    </div>`;
+  }
+
+  function renderTaskItem(task) {
+    const priorityCls = isUrgent(task) ? 'is-urgent' : isHigh(task) ? 'is-high' : '';
+    const due = task.due ? formatDue(task.due) : null;
+    const id = task.id;
+    return `<div class="task-item ${priorityCls}" id="ti-${id}">
+      <button class="task-check" onclick="completeTask('${id}')" aria-label="Mark complete" type="button"></button>
+      <div class="task-body" onclick="startEdit('${id}')">
+        <div class="task-text">${task.emoji ? esc(task.emoji) + ' ' : ''}${esc(task.text)}</div>
+        <div class="task-meta">
+          ${task.priority && task.priority !== 'normal' ? `<span class="priority-badge p-${task.priority}">${task.priority}</span>` : ''}
+          ${due ? `<span class="task-due ${due.cls}">${due.text}</span>` : ''}
+        </div>
+        ${task.notes ? `<div class="task-notes">${esc(task.notes)}</div>` : ''}
+      </div>
+      <button class="task-delete" onclick="showDeleteConfirm(event,'${id}')" aria-label="Delete" type="button">✕</button>
+    </div>`;
+  }
+
+  function renderArchiveToggle() {
+    const toggle = document.getElementById('archiveToggle');
+    const sec = document.getElementById('archiveSection');
+    if (!archived.length) { toggle.style.display = 'none'; sec.style.display = 'none'; return; }
+    toggle.style.display = 'inline-block';
+    toggle.textContent = sec.style.display === 'none'
+      ? `Show completed (${archived.length})`
+      : `Hide completed (${archived.length})`;
+    if (sec.style.display !== 'none') {
+      sec.innerHTML = [...archived].reverse().slice(0, 50).map(t =>
+        `<div class="archived-item">
+          <span class="archived-text">${t.emoji ? esc(t.emoji) + ' ' : ''}${esc(t.text)}</span>
+          <button class="archived-del" onclick="deleteArchived('${t.id}')" type="button">✕</button>
+        </div>`
+      ).join('');
+    }
+  }
+
+  function toggleArchive() {
+    const sec = document.getElementById('archiveSection');
+    sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+    renderArchiveToggle();
+  }
+
+  async function deleteArchived(id) {
+    await deleteTaskFromDb(id);
+    archived = archived.filter(t => t.id !== id);
+    renderArchiveToggle();
+  }
+
+  function renderCalendar() {
+    // Implemented in Task 9
+  }
+
   // === TASK INTERACTIONS ===
   // === VOICE INPUT ===
   // === PARSER ===
@@ -479,7 +603,6 @@
   // === VIEW SWITCHING ===
   // === CALENDAR ===
   // === INIT ===
-  function render() { /* filled in Task 4 */ }
   loadTasks();
 </script>
 </body>
