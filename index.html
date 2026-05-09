@@ -810,10 +810,11 @@ function showEmojiPicker(anchorId, onSelect) {
   const picker = document.createElement('div');
   picker.id = 'emoji-picker';
   const pickerW = 232;
-  const pickerH = 130; // approximate
+  const pickerH = 180; // 5 rows × ~30px + 16px padding
   const left = Math.min(Math.max(4, rect.left), window.innerWidth - pickerW - 4);
   const spaceBelow = window.innerHeight - rect.bottom - 8;
-  const top = spaceBelow >= pickerH ? rect.bottom + 6 : rect.top - pickerH - 6;
+  let top = spaceBelow >= pickerH ? rect.bottom + 6 : rect.top - pickerH - 6;
+  top = Math.max(4, Math.min(top, window.innerHeight - pickerH - 4)); // hard clamp to viewport
   picker.style.cssText = `position:fixed;top:${top}px;left:${left}px;background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:8px;display:grid;grid-template-columns:repeat(10,1fr);gap:2px;z-index:9999;width:${pickerW}px`;
 
   EMOJI_PICKER_LIST.forEach(em => {
@@ -882,70 +883,66 @@ async function drop(event, catId) {
       setTimeout(clearStatus, 3000);
       return;
     }
-    recognition = new SpeechRec();
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.lang = navigator.language || 'en-US';
-    recognition.maxAlternatives = 1;
 
-    let finalTranscript = '';
+    isListening = true;
+    document.getElementById('micBtn').classList.add('listening');
+    setStatus('🎤 Listening...');
 
-    recognition.onstart = () => {
-      finalTranscript = '';
-      isListening = true;
-      document.getElementById('micBtn').classList.add('listening');
-      setStatus('🎤 Listening...');
-    };
+    // sessionFinal accumulates confirmed words across auto-restarts
+    let sessionFinal = '';
 
-    recognition.onsoundstart = () => setStatus('🎤 Sound detected...');
-    recognition.onspeechstart = () => setStatus('🎤 Hearing you...');
-    recognition.onspeechend  = () => setStatus('🎤 Processing...');
+    function newSession() {
+      if (!isListening) return;
+      recognition = new SpeechRec();
+      recognition.continuous = false;   // false is more reliable across browsers
+      recognition.interimResults = true;
+      recognition.lang = navigator.language || 'en-US';
 
-    recognition.onresult = (event) => {
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const text = event.results[i][0].transcript;
-        if (event.results[i].isFinal) { finalTranscript += text + ' '; }
-        else { interimTranscript += text; }
-      }
-      document.getElementById('taskInput').value = (finalTranscript + interimTranscript).trim();
-      setStatus('🎤 Listening...');
-    };
+      recognition.onresult = (event) => {
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const t = event.results[i][0].transcript;
+          if (event.results[i].isFinal) { sessionFinal += t + ' '; }
+          else { interim += t; }
+        }
+        document.getElementById('taskInput').value = (sessionFinal + interim).trim();
+      };
 
-    recognition.onend = () => {
-      // With continuous:true, onend firing means Chrome ended the session unexpectedly.
-      // Restart it as long as the user hasn't stopped manually.
-      if (isListening) {
-        try { recognition.start(); } catch (_) {}
-        return;
-      }
-      document.getElementById('micBtn').classList.remove('listening');
-      clearStatus();
-      recognition = null;
-    };
+      recognition.onend = () => {
+        if (isListening) {
+          newSession(); // auto-restart to keep listening
+        } else {
+          document.getElementById('micBtn').classList.remove('listening');
+          clearStatus();
+          recognition = null;
+        }
+      };
 
-    recognition.onerror = (e) => {
-      if (e.error === 'no-speech') {
-        // Normal with continuous mode — Chrome timed out waiting for speech.
-        // onend will fire next and restart us automatically.
-        setStatus('🎤 Listening...');
-        return;
-      }
-      isListening = false;
-      document.getElementById('micBtn').classList.remove('listening');
-      const msg = e.error === 'not-allowed'
-        ? 'Microphone access denied — check browser permissions'
-        : 'Voice error: ' + e.error;
-      setStatus(msg);
-      setTimeout(clearStatus, 5000);
-      recognition = null;
-    };
+      recognition.onerror = (e) => {
+        if (e.error === 'no-speech') return; // onend fires next, restarts automatically
+        isListening = false;
+        document.getElementById('micBtn').classList.remove('listening');
+        setStatus(e.error === 'not-allowed'
+          ? 'Microphone access denied — check browser permissions'
+          : 'Voice error: ' + e.error);
+        setTimeout(clearStatus, 5000);
+        recognition = null;
+      };
 
-    recognition.start();
+      try { recognition.start(); } catch (_) {}
+    }
+
+    newSession();
   }
 
   function stopListening() {
-    if (recognition) recognition.stop();
+    isListening = false;  // must be set BEFORE stop() so onend does not restart
+    document.getElementById('micBtn').classList.remove('listening');
+    clearStatus();
+    if (recognition) {
+      try { recognition.stop(); } catch (_) {}
+      recognition = null;
+    }
   }
   // === PARSER ===
   function parseTask(raw) {
