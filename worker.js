@@ -34,6 +34,8 @@ Return exactly:
 }
 
 Rules:
+- finance = shopping and buying things — anything involving purchasing, ordering, picking up, or buying something goes here
+- admin = life administration: bills, payments, appointments, renewals, utilities, forms, financial admin
 - mishmish is the user's cat — anything about Mishmish goes in mishmish category
 - urgent = needs doing today or ASAP
 - high = deadline within a week
