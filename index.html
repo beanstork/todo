@@ -925,7 +925,7 @@ async function dropOnTask(event, targetId) {
   if (!draggedId || draggedId === targetId) { draggedId = null; return; }
   const dragged = tasks.find(t => t.id === draggedId);
   const target = tasks.find(t => t.id === targetId);
-  if (!dragged || !target || dragged.category !== target.category) return;
+  if (!dragged || !target || dragged.category !== target.category) { draggedId = null; return; }
   event.preventDefault();
   event.stopPropagation();
 
