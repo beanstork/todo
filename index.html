@@ -338,7 +338,7 @@
   // === DATA ===
   const CATEGORIES = [
     { id: 'admin',     label: 'Life admin',        emoji: '🏠' },
-    { id: 'finance',   label: 'Finance',           emoji: '💰' },
+    { id: 'finance',   label: 'Shopping',          emoji: '🛒' },
     { id: 'projects',  label: 'Personal projects', emoji: '🚀' },
     { id: 'mishmish',  label: 'Mishmish',          emoji: '🐱' },
     { id: 'social',    label: 'Social',            emoji: '🎉' },
@@ -1071,7 +1071,7 @@ async function drop(event, catId) {
     }
     // Fallback: category default emoji
     if (!emoji) {
-      const catEmoji = { personal:'🌸', finance:'💰', admin:'🏠', projects:'🚀', mishmish:'🐱', social:'🎉' };
+      const catEmoji = { personal:'🌸', finance:'🛒', admin:'🏠', projects:'🚀', mishmish:'🐱', social:'🎉' };
       emoji = catEmoji[category];
     }
 
