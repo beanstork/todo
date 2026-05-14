@@ -427,6 +427,21 @@
     }
   }
 
+  async function reorderTasksInDb(updates) {
+    setSyncStatus('syncing');
+    try {
+      await Promise.all(updates.map(({ id, sort_order }) =>
+        db.from('tasks').update({ sort_order }).eq('id', id)
+      ));
+      setSyncStatus('synced');
+      return true;
+    } catch (e) {
+      setSyncStatus('error');
+      setStatus('Reorder failed — check connection');
+      return false;
+    }
+  }
+
   async function deleteTaskFromDb(id) {
     setSyncStatus('syncing');
     try {
@@ -591,7 +606,8 @@
     const due = task.due ? formatDue(task.due) : null;
     const id = task.id;
     return `<div class="task-item ${priorityCls}" id="ti-${id}" draggable="true"
-      ondragstart="dragStart(event,'${id}')" ondragend="dragEnd(event,'${id}')">
+      ondragstart="dragStart(event,'${id}')" ondragend="dragEnd(event,'${id}')"
+      ondragover="dragOverTask(event,'${id}')" ondragleave="dragLeaveTask(event,'${id}')" ondrop="dropOnTask(event,'${id}')">
       <button class="task-check" onclick="completeTask('${id}')" aria-label="Mark complete" type="button"></button>
       <div class="task-body" onclick="startEdit('${id}')">
         <div class="task-text">${task.emoji ? esc(task.emoji) + ' ' : ''}${esc(task.text)}</div>
@@ -853,6 +869,7 @@ function dragStart(event, id) {
 }
 function dragEnd(event, id) {
   document.getElementById('ti-' + id)?.classList.remove('dragging');
+  clearDropIndicators();
   draggedId = null;
 }
 function dragOver(event, catId) {
@@ -867,12 +884,69 @@ function dragLeave(event, catId) {
 }
 async function drop(event, catId) {
   event.preventDefault();
+  clearDropIndicators();
   document.getElementById('cs-' + catId)?.classList.remove('drop-target');
   if (!draggedId) return;
   const task = tasks.find(t => t.id === draggedId);
   if (!task || task.category === catId) { draggedId = null; return; }
-  const ok = await updateTaskInDb(draggedId, { category: catId });
-  if (ok) { task.category = catId; render(); }
+  const ok = await updateTaskInDb(draggedId, { category: catId, sort_order: null });
+  if (ok) { task.category = catId; task.sort_order = null; render(); }
+  draggedId = null;
+}
+
+function clearDropIndicators() {
+  document.querySelectorAll('.task-item.drop-above, .task-item.drop-below').forEach(el => {
+    el.classList.remove('drop-above', 'drop-below');
+  });
+}
+
+function dragOverTask(event, targetId) {
+  if (!draggedId || draggedId === targetId) return;
+  const dragged = tasks.find(t => t.id === draggedId);
+  const target = tasks.find(t => t.id === targetId);
+  if (!dragged || !target || dragged.category !== target.category) return;
+  event.preventDefault();
+  event.stopPropagation();
+  event.dataTransfer.dropEffect = 'move';
+  const rect = event.currentTarget.getBoundingClientRect();
+  const insertBefore = (event.clientY - rect.top) < rect.height / 2;
+  clearDropIndicators();
+  event.currentTarget.classList.add(insertBefore ? 'drop-above' : 'drop-below');
+}
+
+function dragLeaveTask(event, targetId) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    event.currentTarget.classList.remove('drop-above', 'drop-below');
+  }
+}
+
+async function dropOnTask(event, targetId) {
+  clearDropIndicators();
+  if (!draggedId || draggedId === targetId) { draggedId = null; return; }
+  const dragged = tasks.find(t => t.id === draggedId);
+  const target = tasks.find(t => t.id === targetId);
+  if (!dragged || !target || dragged.category !== target.category) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const rect = event.currentTarget.getBoundingClientRect();
+  const insertBefore = (event.clientY - rect.top) < rect.height / 2;
+
+  const catTasks = sortTasks(tasks.filter(t => t.category === dragged.category));
+  const withoutDragged = catTasks.filter(t => t.id !== draggedId);
+  const targetIdx = withoutDragged.findIndex(t => t.id === targetId);
+  const insertIdx = insertBefore ? targetIdx : targetIdx + 1;
+  withoutDragged.splice(insertIdx, 0, dragged);
+
+  const updates = withoutDragged.map((t, i) => ({ id: t.id, sort_order: i + 1 }));
+  updates.forEach(u => {
+    const t = tasks.find(t => t.id === u.id);
+    if (t) t.sort_order = u.sort_order;
+  });
+  render();
+
+  const ok = await reorderTasksInDb(updates);
+  if (!ok) await loadTasks();
   draggedId = null;
 }
 
