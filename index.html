@@ -485,7 +485,8 @@
   }
 
   function sortTasks(arr) {
-    return [...arr].sort((a, b) => {
+    const manual = arr.filter(t => t.sort_order != null).sort((a, b) => a.sort_order - b.sort_order);
+    const auto = arr.filter(t => t.sort_order == null).sort((a, b) => {
       const da = getDaysUntil(a.due);
       const db2 = getDaysUntil(b.due);
       const aOver = da !== null && da < 0;
@@ -501,6 +502,7 @@
       if (pd !== 0) return pd;
       return new Date(a.created_at) - new Date(b.created_at);
     });
+    return [...manual, ...auto];
   }
 
   function esc(s) {
