@@ -1034,9 +1034,9 @@ async function drop(event, catId) {
 
     if (/mishmish|\bcat\b|\bkitten\b|\bvaccinat|\bvet\b|\bcat food\b|\bcat litter\b/i.test(l)) {
       category = 'mishmish';
-    } else if (/\b(pay|bill|invoice|bank|money|budget|tax|insurance|rent|salary|paycheck|credit card|loan|expense|receipt|transfer|pension|accountant|savings|mortgage|refund|subscription)\b/i.test(l)) {
+    } else if (/\b(buy|buying|bought|purchase|order|orders|shop|shopping|groceries|grocery|supermarket|pick up|pickup|get from|collect from|amazon|delivery|deliveries|online order|cart|checkout)\b/i.test(l)) {
       category = 'finance';
-    } else if (/\b(doctor|dentist|appointment|gp|hospital|renew|renewal|license|passport|permit|electricity|gas|water|broadband|council|nhs|visa|driving|mot|plumber|electrician|landlord|estate agent|letting|utility|utilities|insurance claim|form|application|register)\b/i.test(l)) {
+    } else if (/\b(pay|bill|invoice|bank|money|budget|tax|insurance|rent|salary|paycheck|credit card|loan|expense|receipt|transfer|pension|accountant|savings|mortgage|refund|subscription|doctor|dentist|appointment|gp|hospital|renew|renewal|license|passport|permit|electricity|gas|water|broadband|council|nhs|visa|driving|mot|plumber|electrician|landlord|estate agent|letting|utility|utilities|insurance claim|form|application|register)\b/i.test(l)) {
       category = 'admin';
     } else if (/\b(build|develop|code|design|create|launch|ship|project|deploy|write|draft|prototype|feature|bug|fix|research|plan|roadmap|website|app|portfolio|blog|plugin|script|automate)\b/i.test(l)) {
       category = 'projects';
