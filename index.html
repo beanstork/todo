@@ -578,8 +578,10 @@
       renderUrgentStrip();
       renderTaskList();
       renderArchiveToggle();
+      renderDoNow();
     } else {
       renderCalendar();
+      renderDoNow();
     }
   }
 
@@ -682,6 +684,39 @@
         </div>`
       ).join('');
     }
+  }
+
+  function renderDoNow() {
+    const panel = document.getElementById('doNowPanel');
+    if (!panel) return;
+    const doNowTasks = tasks
+      .filter(t => t.do_now)
+      .sort((a, b) => (a.do_now_order ?? 0) - (b.do_now_order ?? 0));
+
+    const taskItems = doNowTasks.map(t =>
+      `<div class="do-now-task" id="dn-${t.id}">
+        <button class="task-check do-now-check" type="button" onclick="completeFromPanel('${t.id}')" aria-label="Mark complete"></button>
+        <span class="do-now-task-text">${t.emoji ? esc(t.emoji) + ' ' : ''}${esc(t.text)}</span>
+        <button class="do-now-remove" type="button" onclick="removeFromDoNow('${t.id}')" aria-label="Remove from Do Now" title="Remove from Do Now">✕</button>
+      </div>`
+    ).join('');
+
+    panel.innerHTML = `
+      <div class="do-now-header">
+        <span style="font-size:16px">⚡</span>
+        <span class="do-now-title">Do Now</span>
+        ${doNowTasks.length ? `<span class="do-now-count">${doNowTasks.length}</span>` : ''}
+      </div>
+      <div class="do-now-hint">Drag tasks here to focus</div>
+      <div class="do-now-drop-zone" id="doNowDropZone"
+        ondragover="doNowDragOver(event)"
+        ondragleave="doNowDragLeave(event)"
+        ondrop="doNowDrop(event)">
+        Drop here
+      </div>
+      ${taskItems}
+      ${doNowTasks.length === 0 ? '<div class="do-now-empty">Nothing here yet</div>' : ''}
+    `;
   }
 
   function toggleArchive() {
