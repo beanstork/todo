@@ -940,6 +940,48 @@ function closeEmojiPicker() {
   document.removeEventListener('click', _closePicker);
 }
 
+// --- Do Now panel actions ---
+async function addToDoNow(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task || task.do_now) return;
+  const doNowTasks = tasks.filter(t => t.do_now);
+  const nextOrder = doNowTasks.length === 0
+    ? 0
+    : Math.max(...doNowTasks.map(t => t.do_now_order ?? 0)) + 1;
+  const ok = await updateTaskInDb(id, { do_now: true, do_now_order: nextOrder });
+  if (ok) {
+    task.do_now = true;
+    task.do_now_order = nextOrder;
+    renderDoNow();
+  }
+}
+
+async function removeFromDoNow(id) {
+  const task = tasks.find(t => t.id === id);
+  if (!task) return;
+  const ok = await updateTaskInDb(id, { do_now: false, do_now_order: null });
+  if (ok) {
+    task.do_now = false;
+    task.do_now_order = null;
+    renderDoNow();
+  }
+}
+
+async function completeFromPanel(id) {
+  const item = document.getElementById('dn-' + id);
+  if (item) {
+    item.style.opacity = '0.4';
+    item.style.pointerEvents = 'none';
+  }
+  const now = new Date().toISOString();
+  await updateTaskInDb(id, { completed: true, completed_at: now, do_now: false, do_now_order: null });
+  const t = tasks.find(t => t.id === id);
+  if (t) { t.completed = true; t.completed_at = now; }
+  tasks = tasks.filter(t => t.id !== id);
+  if (t) archived.push(t);
+  render();
+}
+
 // --- Drag and drop ---
 function dragStart(event, id) {
   draggedId = id;
