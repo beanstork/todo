@@ -30,6 +30,8 @@
       --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
       --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
       --header-h: 57px;
+      --do-now-bg: #F3F0EB;
+      --do-now-border: rgba(0,0,0,0.08);
     }
 
     @media (prefers-color-scheme: dark) {
@@ -48,6 +50,8 @@
         --urgent-light: #2A1512;
         --high: #D4853A;
         --high-light: #2A1E10;
+        --do-now-bg: #201D1A;
+        --do-now-border: rgba(255,255,255,0.06);
       }
     }
 
@@ -114,7 +118,42 @@
     .ai-status { margin-top: 6px; font-size: 12px; color: var(--text-faint); min-height: 16px; font-style: italic; }
 
     /* Main */
-    main { max-width: 680px; margin: 0 auto; padding: 1.25rem 1rem 4rem; }
+    .app-layout { max-width: 980px; margin: 0 auto; display: flex; align-items: flex-start; gap: 0; }
+    main { flex: 1; min-width: 0; padding: 1.25rem 1rem 4rem; }
+
+    /* Do Now sidebar */
+    #doNowPanel {
+      width: 260px; flex-shrink: 0;
+      background: var(--do-now-bg);
+      border-left: 1px solid var(--do-now-border);
+      min-height: calc(100vh - var(--header-h) - 57px);
+      padding: 1.25rem 0.875rem 2rem;
+      position: sticky;
+      top: calc(var(--header-h) + 57px);
+      align-self: flex-start;
+    }
+    .do-now-header { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+    .do-now-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .do-now-count { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--accent-light); color: var(--accent); font-weight: 500; margin-left: auto; }
+    .do-now-hint { font-size: 11px; color: var(--text-faint); margin-bottom: 0.875rem; }
+    .do-now-drop-zone {
+      border: 2px dashed var(--border-strong); border-radius: var(--radius-sm);
+      padding: 8px; min-height: 40px; margin-bottom: 0.75rem;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: var(--text-faint); transition: border-color 0.15s, background 0.15s;
+    }
+    .do-now-drop-zone.drop-target { border-color: var(--accent); background: var(--accent-light); color: var(--accent); }
+    .do-now-task {
+      display: flex; align-items: flex-start; gap: 8px; padding: 9px 10px;
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      margin-bottom: 6px;
+    }
+    .do-now-task .task-check { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+    .do-now-task-text { font-size: 13px; line-height: 1.45; color: var(--text); flex: 1; min-width: 0; word-break: break-word; }
+    .do-now-remove { background: none; border: none; cursor: pointer; color: var(--text-faint); font-size: 13px; padding: 1px 3px; line-height: 1; flex-shrink: 0; opacity: 0; transition: opacity 0.15s, color 0.15s; }
+    .do-now-task:hover .do-now-remove { opacity: 1; }
+    .do-now-task:hover .do-now-remove:hover { color: var(--urgent); }
+    .do-now-empty { font-size: 12px; color: var(--text-faint); font-style: italic; text-align: center; padding: 1rem 0.5rem; }
 
     /* Filter pills */
     .filter-row { display: flex; gap: 6px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; margin-bottom: 0.75rem; scrollbar-width: none; }
@@ -279,6 +318,7 @@
       .task-delete { opacity: 1; }
       .archived-del { opacity: 1; }
       .editor-row { grid-template-columns: 1fr; }
+      #doNowPanel { display: none; }
     }
   </style>
 </head>
