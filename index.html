@@ -373,7 +373,10 @@
   </div>
 </main>
 
-<aside id="doNowPanel"></aside>
+<aside id="doNowPanel"
+  ondragover="doNowDragOver(event)"
+  ondragleave="doNowDragLeave(event)"
+  ondrop="doNowDrop(event)"></aside>
 </div>
 
 <script>
