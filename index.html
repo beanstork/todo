@@ -982,6 +982,26 @@ async function completeFromPanel(id) {
   render();
 }
 
+function doNowDragOver(event) {
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'copy';
+  document.getElementById('doNowDropZone')?.classList.add('drop-target');
+}
+
+function doNowDragLeave(event) {
+  if (!event.currentTarget.contains(event.relatedTarget)) {
+    document.getElementById('doNowDropZone')?.classList.remove('drop-target');
+  }
+}
+
+function doNowDrop(event) {
+  event.preventDefault();
+  document.getElementById('doNowDropZone')?.classList.remove('drop-target');
+  if (!draggedId) return;
+  addToDoNow(draggedId);
+  draggedId = null;
+}
+
 // --- Drag and drop ---
 function dragStart(event, id) {
   draggedId = id;
